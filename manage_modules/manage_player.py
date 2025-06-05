@@ -19,14 +19,14 @@ def render():
     players = mpc.get_players(search_query)
 
     # Display table header
-    header_cols = st.columns([1, 3, 3, 2, 1, 1, 1, 1, 1])
-    headers = ["Avatar", "Username", "Email", "Role", "Points", "Leagues", "Cups", "Edit", "Delete"]
+    header_cols = st.columns([1, 3, 3, 2, 1, 1, 1, 2, 1, 1])
+    headers = ["Avatar", "Username", "Email", "Role", "Points", "Leagues", "Cups", "Last Login", "Edit", "Delete"]
     for col, header in zip(header_cols, headers):
         col.markdown(f"**{header}**")
 
     # Show players list
     for player in players:
-        cols = st.columns([1, 3, 3, 2, 1, 1, 1, 1, 1])  # avatar, username, email, role, points, leagues, cups, edit, delete
+        cols = st.columns([1, 3, 3, 2, 1, 1, 1, 2, 1, 1])  # avatar, username, email, role, points, leagues, cups, last login, edit, delete
 
         with cols[0]:
             avatar_url = player.get("avatar_url")
@@ -48,20 +48,24 @@ def render():
             st.write(player["role"])
 
         with cols[4]:
-            st.write(player.get("points", 0))
+            st.write(player.get("total_points", 0))
 
         with cols[5]:
-            st.write(player.get("leagues_won", 0))
+            st.write(player.get("total_leagues_won", 0))
 
         with cols[6]:
-            st.write(player.get("cups_won", 0))
+            st.write(player.get("total_cups_won", 0))
 
         with cols[7]:
+            last_login = player.get("last_login_at")
+            st.write(last_login if last_login else "—")
+
+        with cols[8]:
             if st.button("✏️", key=f"edit_{player['id']}"):
                 st.session_state["show_add_edit_modal"] = True
                 st.session_state["editing_player"] = player
 
-        with cols[8]:
+        with cols[9]:
             confirm_key = f"confirm_del_{player['id']}"
             if st.session_state.get(confirm_key, False):
                 st.warning(f"⚠️ Are you sure you want to delete **{player['username']}**?")
@@ -112,20 +116,14 @@ def show_add_edit_modal():
         canceled = st.form_submit_button("Cancel")
 
         if submitted:
-            password_hash = None
-            if password:
-                password_hash = hashlib.sha256(password.encode()).hexdigest()
-
             if is_editing:
-                # Remove avatar_file param for now to avoid error
-                success = mpc.update_player(player["id"], username, email, role, password_hash)
+                success = mpc.update_player(player["id"], username, email, role, password)
                 if success:
                     st.success("Player updated!")
                 else:
                     st.error("Failed to update player.")
             else:
-                # Remove avatar_file param for now to avoid error
-                new_id = mpc.add_player(username, email, role, password_hash)
+                new_id = mpc.add_player(username, email, role, password)
                 if new_id:
                     st.success("Player added!")
                 else:
