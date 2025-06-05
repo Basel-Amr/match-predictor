@@ -1,5 +1,6 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
+from manage_modules import manage_player, manage_clubs_leages, manage_matches, manage_perdictions, manage_cup, manage_tournment
 def show_animation():
     st.markdown(
         """
@@ -60,24 +61,25 @@ def render():
     if sub_tab == "Manage Players":
         st.markdown("### 👥 Manage Players")
         st.success("Here you can **add**, **update**, or **delete** player accounts and avatars.")
-        # player_management.render()
+        manage_player.render()
 
     elif sub_tab == "Manage Clubs & Leagues":
         st.markdown("### 🏟️ Manage Clubs & Leagues")
         st.info("Add or update football clubs, assign them to leagues, and maintain hierarchy.")
-
+        manage_clubs_leages.render()
     elif sub_tab == "Manage Matches":
         st.markdown("### 📅 Manage Matches")
         st.warning("Organize upcoming fixtures, set results, and update live match data.")
-
+        manage_matches.render()
     elif sub_tab == "Manage Prediction":
         st.markdown("### 🔮 Manage Predictions")
         st.info("Control user prediction logic, evaluate scores, and audit prediction history.")
-
+        manage_perdictions.render()
     elif sub_tab == "Manage Cup":
         st.markdown("### 🏆 Manage Cup")
         st.success("Setup cup rules, teams, knockout stages, and update match outcomes.")
-
+        manage_cup.render()
     elif sub_tab == "Manage Tournament":
         st.markdown("### 🎯 Manage Tournament")
         st.warning("Design and organize league or group tournaments with scheduling and stats.")
+        manage_tournment.render()
