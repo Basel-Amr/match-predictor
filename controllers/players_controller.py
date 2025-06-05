@@ -66,8 +66,24 @@ def delete_player(player_id):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        cur.execute("DELETE FROM players WHERE id=?", (player_id,))
+        # Get avatar path from DB
+        cur.execute("SELECT avatar_path FROM players WHERE id = ?", (player_id,))
+        row = cur.fetchone()
+        avatar_path = row[0] if row else None
+
+        # Delete player from DB
+        cur.execute("DELETE FROM players WHERE id = ?", (player_id,))
         conn.commit()
+
+        # Normalize path and delete image
+        if avatar_path:
+            normalized_path = os.path.normpath(avatar_path)
+            if os.path.exists(normalized_path):
+                os.remove(normalized_path)
+                print(f"✅ Deleted avatar: {normalized_path}")
+            else:
+                print(f"❌ Avatar path does not exist: {normalized_path}")
+
         return True
     except Exception as e:
         print("Error deleting player:", e)
@@ -88,7 +104,7 @@ def get_player_id_by_username(username):
 
 def save_avatar_image(player_id, image):
     """
-    Save avatar image (PIL Image or UploadedFile) to 'assets/avatars' folder as '{player_id}.png'.
+    Save avatar image to 'assets/avatars/{player_id}.png' and update avatar_path in DB.
 
     Args:
         player_id (int): Player's ID.
@@ -97,17 +113,15 @@ def save_avatar_image(player_id, image):
     Returns:
         str: Relative path to the saved avatar image.
     """
-
     avatars_dir = os.path.join("assets", "avatars")
     if not os.path.exists(avatars_dir):
         os.makedirs(avatars_dir)
 
-    save_path = os.path.join(avatars_dir, f"{player_id}.png")  # Always save as PNG
+    save_path = os.path.join(avatars_dir, f"{player_id}.png")  # Save as PNG
 
     if isinstance(image, Image.Image):
-        # If it's a PIL Image, save directly as PNG
         image.save(save_path, format="PNG")
-    elif hasattr(image, "getbuffer"):  # UploadedFile from Streamlit
+    elif hasattr(image, "getbuffer"):  # Streamlit UploadedFile
         with open(save_path, "wb") as f:
             f.write(image.getbuffer())
     elif isinstance(image, bytes):
@@ -116,4 +130,16 @@ def save_avatar_image(player_id, image):
     else:
         raise ValueError("Unsupported image type")
 
-    return save_path.replace("\\", "/")  # normalize path for Windows
+    # Normalize path for DB storage
+    normalized_path = save_path.replace("\\", "/")
+
+    # ✅ Update the DB
+    conn = get_connection()
+    cur = conn.cursor()
+    try:
+        cur.execute("UPDATE players SET avatar_path = ? WHERE id = ?", (normalized_path, player_id))
+        conn.commit()
+    finally:
+        conn.close()
+
+    return normalized_path

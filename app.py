@@ -2,7 +2,8 @@ import streamlit as st
 from streamlit_option_menu import option_menu
 import auth
 
-from pages import profile, predictions, leaderboard, achievement, manage, cup
+from modules import profile, predictions, leaderboard, achievement, manage, cup
+
 from controllers.players_controller import get_player_id_by_username
 
 # Page Configuration
@@ -11,6 +12,16 @@ st.set_page_config(
     page_icon="⚽",
     layout="wide",  # wider layout for full-width text
     initial_sidebar_state="expanded"
+)
+st.markdown(
+    """
+    <style>
+        [data-testid="stSidebarNav"] {
+            display: none;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True
 )
 
 # 💡 Custom Font & Styling
