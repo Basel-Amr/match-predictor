@@ -286,13 +286,11 @@ def render_team_management():
                 text-align: center;
             }
             .centered {
+                text-align: center;
                 display: flex;
-                justify-content: center;
                 align-items: center;
+                justify-content: center;
                 height: 100%;
-            }
-            .row-spacer {
-                height: 20px;
             }
         </style>
         """,
@@ -390,7 +388,6 @@ def render_team_list(teams, leagues):
 
 
 
-
 def render_add_team_form(leagues):
     st.markdown("### Add New Team")
     with st.form("add_team_form"):
@@ -430,10 +427,46 @@ def render_edit_team_form(team, leagues):
             st.rerun()
 
 
+# Icons
+LEAGUE_ICON = "🏆"
+TEAM_ICON = "👕"
+
+def local_css():
+    st.markdown("""
+        <style>
+            .centered-title {
+                text-align: center;
+                font-size: 32px;
+                font-weight: bold;
+                color: #1f77b4;
+                margin-bottom: 30px;
+            }
+            .tab-container {
+                margin-top: 20px;
+            }
+            .stTabs [role="tab"] {
+                border: 2px solid #d1d1d1;
+                padding: 10px;
+                margin-right: 8px;
+                border-radius: 5px 5px 0 0;
+                background-color: #f0f2f6;
+                font-weight: 600;
+                color: #333;
+                transition: all 0.3s ease-in-out;
+            }
+            .stTabs [role="tab"][aria-selected="true"] {
+                background-color: #1f77b4;
+                color: white;
+                border-color: #1f77b4;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
 def render():
     local_css()
-    st.sidebar.title("Navigation")
-    page = st.sidebar.radio("Go to", [f"{LEAGUE_ICON} Leagues", f"{TEAM_ICON} Teams"])
+
+    # Centered page title
+    st.markdown('<div class="centered-title">⚽ Football Prediction Admin Panel</div>', unsafe_allow_html=True)
 
     # Session state defaults
     if "status_message" not in st.session_state:
@@ -447,8 +480,13 @@ def render():
     if "edit_team_id" not in st.session_state:
         st.session_state.edit_team_id = None
 
-    # Show page
-    if page == f"{LEAGUE_ICON} Leagues":
+    # Centered tabs in the body instead of sidebar
+    st.markdown('<div class="tab-container">', unsafe_allow_html=True)
+    tabs = st.tabs([f"{LEAGUE_ICON} Leagues", f"{TEAM_ICON} Teams"])
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    with tabs[0]:
         render_league_management()
-    elif page == f"{TEAM_ICON} Teams":
+
+    with tabs[1]:
         render_team_management()
