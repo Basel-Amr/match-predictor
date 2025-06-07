@@ -1,0 +1,20 @@
+AC Milan: https://crests.football-data.org/98.png
+ACF Fiorentina: https://crests.football-data.org/99.png
+AS Roma: https://crests.football-data.org/100.png
+Atalanta BC: https://crests.football-data.org/102.png
+Bologna FC 1909: https://crests.football-data.org/103.png
+Cagliari Calcio: https://crests.football-data.org/104.png
+Genoa CFC: https://crests.football-data.org/107.png
+FC Internazionale Milano: https://crests.football-data.org/108.png
+Juventus FC: https://crests.football-data.org/109.png
+SS Lazio: https://crests.football-data.org/110.png
+Parma Calcio 1913: https://crests.football-data.org/112.png
+SSC Napoli: https://crests.football-data.org/113.png
+Udinese Calcio: https://crests.football-data.org/115.png
+Empoli FC: https://crests.football-data.org/445.png
+Hellas Verona FC: https://crests.football-data.org/450.png
+Venezia FC: https://crests.football-data.org/454.png
+Torino FC: https://crests.football-data.org/586.png
+US Lecce: https://crests.football-data.org/5890.png
+AC Monza: https://crests.football-data.org/5911.png
+Como 1907: https://crests.football-data.org/7397.png

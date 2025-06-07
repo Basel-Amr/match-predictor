@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 # from controllers.manage_clubs_leagues_controller import (
 #     get_leagues, add_league, update_league, delete_league,
 #     get_teams, add_team, update_team, delete_team
@@ -336,10 +337,14 @@ def render_team_list(teams, leagues):
         # Logo
         with cols[0]:
             st.markdown('<div class="centered">', unsafe_allow_html=True)
-            if team.get("logo_path"):
-                st.image(team["logo_path"], width=40)
-            else:
-                st.write("—")
+            logo_path = team.get("logo_path")
+            try:
+                if logo_path and os.path.exists(logo_path):
+                    st.image(logo_path, width=40)
+                else:
+                    st.image("assets/no_image.png", width=40)  # Provide this default image
+            except:
+                st.image("assets/no_image.png", width=40)
             st.markdown('</div>', unsafe_allow_html=True)
 
         # Name
