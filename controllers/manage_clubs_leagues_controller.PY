@@ -46,20 +46,20 @@ def save_logo(file):
 # ✅ TEAM CRUD FUNCTIONS
 # -------------------------------
 
-def add_team(name: str, league_ids: List[int], logo_file=None) -> Tuple[bool, str]:
+def add_team(name: str, league_ids: List[int], logo_file=None, nationality: str = "Europe") -> Tuple[bool, str]:
     try:
         conn = get_connection()
         cursor = conn.cursor()
 
         logo_path = save_logo(logo_file) if logo_file else None
 
-        # Insert into teams table
+        # Insert into teams table including nationality
         cursor.execute("""
-            INSERT INTO teams (name, logo_path)
-            VALUES (?, ?)
-        """, (name, logo_path))
+            INSERT INTO teams (name, logo_path, nationality)
+            VALUES (?, ?, ?)
+        """, (name, logo_path, nationality))
 
-        team_id = cursor.lastrowid  # Get the auto-incremented team ID
+        team_id = cursor.lastrowid
 
         # Insert into team_league mapping table
         for league_id in league_ids:
@@ -79,21 +79,14 @@ def add_team(name: str, league_ids: List[int], logo_file=None) -> Tuple[bool, st
 
 
 
+
+
+
+
 def update_team(team_id: int, name: Optional[str] = None,
                 league_id: Optional[int] = None,
-                logo_file=None) -> Tuple[bool, str]:
-    """
-    Update an existing team's name, league, or logo.
-
-    Args:
-        team_id (int): ID of the team to update.
-        name (str, optional): New name.
-        league_id (int, optional): New league ID.
-        logo_file (optional): New logo file.
-
-    Returns:
-        Tuple[bool, str]: Operation status and message.
-    """
+                logo_file=None,
+                nationality: str = None) -> Tuple[bool, str]:
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -112,6 +105,9 @@ def update_team(team_id: int, name: Optional[str] = None,
             if logo_path:
                 fields.append("logo_path = ?")
                 values.append(logo_path)
+        if nationality:
+            fields.append("nationality = ?")
+            values.append(nationality)
 
         if not fields:
             return False, "⚠️ No fields to update."
@@ -126,6 +122,10 @@ def update_team(team_id: int, name: Optional[str] = None,
         return False, f"❌ Error updating team: {e}"
     finally:
         conn.close()
+
+
+
+
 
 
 def delete_team(team_id: int) -> Tuple[bool, str]:

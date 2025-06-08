@@ -1,11 +1,20 @@
 # manage_modules/manage_matches.py
 import streamlit as st
+import os
 from datetime import datetime
+import sqlite3
+# Add match part
 from controllers.manage_matches_controller import get_all_leagues, get_teams_by_league, add_match, check_duplicate_match, get_round_id_by_date
-
+# View match part
+from controllers.manage_matches_controller import fetch_rounds, fetch_matches_by_round, delete_match_by_id, update_match_partial, fetch_leagues, fetch_teams
+from itertools import groupby
+from streamlit_autorefresh import st_autorefresh
+from datetime import datetime, timedelta
 # Icons
 MANAGE_ICON = "🛠️"
 VIEW_ICON = "📅"
+EDIT_ICON = "✏️"  # Pencil emoji for edit
+DELETE_ICON = "🗑️"  # Trash can emoji for delete
 
 def render():
     st.markdown("""
@@ -122,8 +131,231 @@ def render_manage_matches_tab():
             st.error("Failed to add match. Please try again.")
 
 
-
+##----------------------------------------------------------------------------------------------------------------------##
 def render_view_matches_tab():
     st.markdown(f'<div class="emoji-header">{VIEW_ICON} View Matches by Round</div>', unsafe_allow_html=True)
     st.info("Browse and filter scheduled matches based on league and round.")
-    st.write("📅 Match viewing UI will go here...")
+
+    # ⚙️ Customizing refresh rate
+    refresh_option = st.selectbox("⚙️ Auto Refresh Interval", ["15 sec", "30 sec", "1 min", "2 min", "5 min"])
+    refresh_map = {
+        "15 sec": 15 * 1000,
+        "30 sec": 30 * 1000,
+        "1 min": 60 * 1000,
+        "2 min": 120 * 1000,
+        "5 min": 300 * 1000
+    }
+    st_autorefresh(interval=refresh_map[refresh_option], key="match_view_autorefresh")
+
+    rounds = fetch_rounds()
+    if not rounds:
+        st.warning("No rounds available.")
+        return
+
+    round_names = {r['name']: r['id'] for r in rounds}
+    selected_round_name = st.selectbox("Select Round", list(round_names.keys()))
+    selected_round_id = round_names[selected_round_name]
+
+    matches = fetch_matches_by_round(selected_round_id)
+    if not matches:
+        st.info("No matches scheduled for this round.")
+        return
+
+    now = datetime.now()
+
+    # 🌍 Set locale for localized date formatting (try user's OS locale)
+    try:
+        locale.setlocale(locale.LC_TIME, '')
+    except:
+        pass
+
+    for league, group in groupby(matches, key=lambda m: m['league_name']):
+        league_logo_path = next((g['league_logo'] for g in matches if g['league_name'] == league), None)
+
+        st.markdown("<div style='display: flex; align-items: center;'>", unsafe_allow_html=True)
+        cols = st.columns([0.07, 0.93])
+        with cols[0]:
+            if league_logo_path:
+                st.image(league_logo_path, width=30)
+        with cols[1]:
+            st.markdown(f"<h5 style='margin:0;padding:0;'>{league}</h5>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        for match in group:
+            match_time = datetime.fromisoformat(match['match_datetime'])
+            time_diff = match_time - now
+            total_seconds_left = time_diff.total_seconds()
+            hours_left = total_seconds_left / 3600
+            minutes_left = int(total_seconds_left / 60)
+            match_date = match_time.date()
+            time_str = match_time.strftime('%I:%M %p')
+
+            # 🧭 Display tag and live progress bar
+            if 0 < hours_left <= 1:
+                date_display = f"<span style='background:#fff3cd;color:#d63384;font-weight:bold;padding:6px 14px;border-radius:14px;font-size:1rem;'>⏰ {minutes_left} minutes left!</span>"
+            elif 1 < hours_left <= 10:
+                date_display = f"<span style='background:#ffeeba;color:#856404;font-weight:bold;padding:6px 14px;border-radius:14px;font-size:1rem;'>⏰ {int(hours_left)} hours left!</span>"
+            elif match_date == now.date():
+                date_display = f"<span style='background:#f8d7da;color:#721c24;font-weight:bold;padding:6px 14px;border-radius:14px;font-size:1rem;'>🔴 Today</span>"
+            elif match_date == now.date() + timedelta(days=1):
+                date_display = f"<span style='background:#d1ecf1;color:#0c5460;font-weight:bold;padding:6px 14px;border-radius:14px;font-size:1rem;'>🌙 Tomorrow</span>"
+            else:
+                date_display = match_time.strftime('%A, %B %d, %Y')
+
+            # 🧭 Live countdown progress bar (within 12h)
+            progress = None
+            if 0 < hours_left <= 12:
+                total = 12 * 3600
+                current = total - total_seconds_left
+                progress = float(current / total)
+
+            home_logo_path = match['home_team_logo']
+            away_logo_path = match['away_team_logo']
+
+            cols = st.columns([1, 5, 5, 5, 5, 1])
+
+
+
+            # Home Team
+            with cols[0]:
+                st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
+                if home_logo_path:
+                    st.image(home_logo_path, width=45)
+                st.markdown(
+                    f"<div style='font-weight:600;margin-top:5px;'>{match['home_team_name']}</div>",
+                    unsafe_allow_html=True
+                )
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            # Center Info (Time + Status + Result)
+            with cols[1]:
+                st.markdown(
+                    f"""
+                    <div style='
+                        display: flex; 
+                        flex-direction: column; 
+                        justify-content: center; 
+                        align-items: center; 
+                        height: 100%; 
+                        text-align: center;
+                        padding: 5px;
+                    '>
+                        <div style='font-size:1.1rem;font-weight:bold;margin-bottom:4px;'>{time_str}</div>
+                        <div style='margin:4px 0;'>{date_display}</div>
+                        <div style='margin:4px 0;'>{render_match_result(match)}</div>
+                        <div style='margin-top:4px;'>{render_status_tag(match['status'])}</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+            # Away Team
+            with cols[2]:
+                st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
+                if away_logo_path:
+                    st.image(away_logo_path, width=45)
+                st.markdown(
+                    f"<div style='font-weight:600;margin-top:5px;'>{match['away_team_name']}</div>",
+                    unsafe_allow_html=True
+                )
+                st.markdown("</div>", unsafe_allow_html=True)
+
+            # Edit Button
+            with cols[3]:
+                if st.button(EDIT_ICON, key=f"edit_match_{match['id']}"):
+                    st.session_state.edit_match_id = match['id']
+                    st.session_state.show_add_match_form = False
+
+            # Delete Button
+            with cols[4]:
+                if st.button(DELETE_ICON, key=f"delete_match_{match['id']}"):
+                    delete_match_by_id(match['id'])
+                    st.session_state.status_message = "Match deleted."
+                    st.rerun()
+
+            # Inline edit form
+            if st.session_state.get("edit_match_id") == match["id"]:
+                render_edit_match(match)
+
+            st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+
+
+
+
+
+            
+            
+def render_edit_match(match):
+    st.markdown("### ✏️ Edit Match")
+
+    match_dt = datetime.fromisoformat(match['match_datetime'])
+
+    # Fetch data
+    rounds = {r['id']: r['name'] for r in fetch_rounds()}
+    leagues = {l['id']: l['name'] for l in fetch_leagues()}
+    teams = {t['id']: t['name'] for t in fetch_teams()}
+
+    with st.form(key=f"edit_form_{match['id']}"):
+        # Read-only details
+        st.text_input("Round", rounds.get(match['round_id'], "Unknown"), disabled=True)
+        st.text_input("League", leagues.get(match['league_id'], "Unknown"), disabled=True)
+        st.text_input("Home Team", teams.get(match['home_team_id'], "Unknown"), disabled=True)
+        st.text_input("Away Team", teams.get(match['away_team_id'], "Unknown"), disabled=True)
+
+        # Editable fields
+        date_input = st.date_input("Match Date", value=match_dt.date())
+        time_input = st.time_input("Match Time", value=match_dt.time())
+        combined_datetime = datetime.combine(date_input, time_input)
+
+        status = st.selectbox("Status", ["upcoming", "live","finished", "cancelled"],
+                              index=["upcoming", "live","finished", "cancelled"].index(match['status']))
+        home_score = st.number_input("Home Score", value=match['home_score'], step=1)
+        away_score = st.number_input("Away Score", value=match['away_score'], step=1)
+
+        submitted = st.form_submit_button("Save Changes")
+
+        if submitted:
+            # New lightweight update function call
+            update_match_partial(
+                match_id=match['id'],
+                match_datetime=combined_datetime.isoformat(),
+                status=status,
+                home_score=home_score,
+                away_score=away_score
+            )
+            st.success("Match updated successfully!")
+            st.session_state.edit_match_id = None
+            st.rerun()
+
+
+
+
+def render_status_tag(status):
+    colors = {
+        'upcoming': '#3498db',
+        'live': '#e67e22',
+        'finished': '#2ecc71',
+        'cancelled': '#e74c3c'
+    }
+    icons = {
+        'upcoming': '⏳',
+        'live': '🔴',
+        'finished': '✅',
+        'cancelled': '❌'
+    }
+    return f"<span style='background:{colors[status]};color:white;padding:2px 8px;border-radius:5px;'>{icons[status]} {status.capitalize()}</span>"
+
+def render_match_result(match):
+    if match['home_score'] is not None and match['away_score'] is not None:
+        home = match['home_score']
+        away = match['away_score']
+        if home > away:
+            result = f"<span style='color:green;'>🏆 {home} - {away}</span>"
+        elif home < away:
+            result = f"<span style='color:red;'>{home} - {away} 🏆</span>"
+        else:
+            result = f"<span style='color:orange;'>🤝 {home} - {away}</span>"
+        return f"<div style='font-size:1.5rem; font-weight:bold;'>{result}</div>"
+    return "<div style='color:#888;'>Not Available</div>"
+
+

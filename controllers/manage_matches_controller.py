@@ -1,7 +1,8 @@
 # controllers/manage_matches_controller.py
 from db import get_connection
 from datetime import datetime, timedelta
-
+from utils import execute_query, fetch_one, fetch_all
+import sqlite3
 def execute_query(query, params=()):
     conn = get_connection()
     cursor = conn.cursor()
@@ -184,3 +185,74 @@ def get_round_id_by_date(match_date):
     else:
         print("Failed to find the round after insert.")
         raise Exception("Failed to create or fetch the round")
+
+
+def fetch_rounds():
+    query = """
+        SELECT id, name 
+        FROM rounds 
+        ORDER BY start_date ASC
+    """
+    return fetch_all(query)
+
+def fetch_matches_by_round(round_id):
+    query = """
+        SELECT
+            m.id,
+            m.match_datetime,
+            m.status,
+            m.home_score,
+            m.away_score,
+
+            home.id AS home_team_id,
+            home.name AS home_team_name,
+            home.logo_path AS home_team_logo,
+
+            away.id AS away_team_id,
+            away.name AS away_team_name,
+            away.logo_path AS away_team_logo,
+
+            l.id AS league_id,
+            l.name AS league_name,
+            l.logo_path AS league_logo,
+
+            m.round_id
+
+        FROM matches m
+        JOIN teams home ON m.home_team_id = home.id
+        JOIN teams away ON m.away_team_id = away.id
+        JOIN leagues l ON m.league_id = l.id
+        WHERE m.round_id = ?
+        ORDER BY l.name ASC, m.match_datetime ASC
+    """
+    return fetch_all(query, (round_id,))
+
+
+def delete_match_by_id(match_id):
+    query = """
+        DELETE FROM matches 
+        WHERE id = ?
+    """
+    execute_query(query, (match_id,))
+    
+def update_match_partial(match_id, match_datetime, status, home_score, away_score):
+    query = """
+        UPDATE matches
+        SET 
+            match_datetime = ?,
+            status = ?,
+            home_score = ?,
+            away_score = ?
+        WHERE id = ?
+    """
+    params = (match_datetime, status, home_score, away_score, match_id)
+    execute_query(query, params)
+
+def fetch_leagues():
+    query = "SELECT id, name, logo_path FROM leagues"
+    return fetch_all(query)
+
+
+def fetch_teams():
+    query = "SELECT id, name, logo_path FROM teams"
+    return fetch_all(query)
