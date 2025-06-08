@@ -46,6 +46,19 @@ def fetch_one(query, params=()):
         cursor.close()
         conn.close()
 
+def execute_read_query(query, params=()):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        columns = [column[0] for column in cursor.description]
+        results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        conn.close()
+        return results
+    except Exception as e:
+        print(f"[ERROR] Failed to execute read query: {e}")
+        return []
+
 def get_all_leagues():
     return fetch_all("SELECT id, name FROM leagues")
 
@@ -249,10 +262,54 @@ def update_match_partial(match_id, match_datetime, status, home_score, away_scor
     execute_query(query, params)
 
 def fetch_leagues():
-    query = "SELECT id, name, logo_path FROM leagues"
+    query = """
+        SELECT id, name, logo_path, can_be_draw, two_legs, must_have_winner
+        FROM leagues
+    """
     return fetch_all(query)
+
 
 
 def fetch_teams():
     query = "SELECT id, name, logo_path FROM teams"
     return fetch_all(query)
+
+def update_match_status(match_id, new_status):
+    query = "UPDATE matches SET status = ? WHERE id = ?"
+    execute_query(query, (new_status, match_id))
+
+
+def change_match_status(match):
+    match_time = datetime.fromisoformat(match['match_datetime'])
+    now = datetime.now()
+
+    if match['status'] == 'upcoming' and now >= match_time:
+        update_match_status(match['id'], 'live')
+        #match['status'] = 'live'  # reflect change in UI immediately
+
+    elif match['status'] == 'live' and now >= match_time + timedelta(hours=3):
+        update_match_status(match['id'], 'finished')
+        #match['status'] = 'finished'  # reflect change in UI immediately
+        
+def fetch_legs_by_match_id(match_id):
+    query = "SELECT * FROM legs WHERE match_id = ?"
+    return execute_read_query(query, (match_id,))
+
+def insert_or_replace_leg(match_id, leg_number, leg_date, home_score, away_score, can_draw, winner_team_id, notes):
+    query = """
+    INSERT OR REPLACE INTO legs (
+        match_id, leg_number, leg_date,
+        home_score, away_score,
+        can_draw, winner_team_id, notes
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    params = (
+        match_id, leg_number, leg_date,
+        home_score, away_score, can_draw,
+        winner_team_id, notes
+    )
+    execute_query(query, params)
+
+
+
+        

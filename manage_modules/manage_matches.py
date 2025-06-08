@@ -6,7 +6,7 @@ import sqlite3
 # Add match part
 from controllers.manage_matches_controller import get_all_leagues, get_teams_by_league, add_match, check_duplicate_match, get_round_id_by_date
 # View match part
-from controllers.manage_matches_controller import fetch_rounds, fetch_matches_by_round, delete_match_by_id, update_match_partial, fetch_leagues, fetch_teams
+from controllers.manage_matches_controller import fetch_rounds, fetch_matches_by_round, delete_match_by_id, update_match_partial, fetch_leagues, fetch_teams, change_match_status, insert_or_replace_leg, fetch_legs_by_match_id
 from itertools import groupby
 from streamlit_autorefresh import st_autorefresh
 from datetime import datetime, timedelta
@@ -172,7 +172,7 @@ def render_view_matches_tab():
     for league, group in groupby(matches, key=lambda m: m['league_name']):
         league_logo_path = next((g['league_logo'] for g in matches if g['league_name'] == league), None)
 
-        st.markdown("<div style='display: flex; align-items: center;'>", unsafe_allow_html=True)
+        st.markdown("<div style='display: flex; align-items: center; justify-content: center;'>", unsafe_allow_html=True)
         cols = st.columns([0.07, 0.93])
         with cols[0]:
             if league_logo_path:
@@ -189,9 +189,12 @@ def render_view_matches_tab():
             minutes_left = int(total_seconds_left / 60)
             match_date = match_time.date()
             time_str = match_time.strftime('%I:%M %p')
+            change_match_status(match)
 
             # 🧭 Display tag and live progress bar
-            if 0 < hours_left <= 1:
+            if 0 < minutes_left < 1:
+                date_display = f"<span style='background:#fff3cd;color:#d63384;font-weight:bold;padding:6px 14px;border-radius:14px;font-size:1rem;'>⏰ less than one minute!</span>"
+            elif 0 < hours_left <= 1:
                 date_display = f"<span style='background:#fff3cd;color:#d63384;font-weight:bold;padding:6px 14px;border-radius:14px;font-size:1rem;'>⏰ {minutes_left} minutes left!</span>"
             elif 1 < hours_left <= 10:
                 date_display = f"<span style='background:#ffeeba;color:#856404;font-weight:bold;padding:6px 14px;border-radius:14px;font-size:1rem;'>⏰ {int(hours_left)} hours left!</span>"
@@ -212,9 +215,22 @@ def render_view_matches_tab():
             home_logo_path = match['home_team_logo']
             away_logo_path = match['away_team_logo']
 
-            cols = st.columns([1, 5, 5, 5, 5, 1])
+            st.markdown(
+                """
+                <div style='
+                    background: linear-gradient(to right, #f8f9fa, #e9ecef);
+                    border-radius: 18px;
+                    padding: 20px;
+                    margin: 15px 0;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+                    max-width: 900px;
+                    margin-left: auto;
+                    margin-right: auto;
+                '>
+                """, unsafe_allow_html=True
+            )
 
-
+            cols = st.columns([2.5, 5, 2.5, 1, 1])  # Home, Info, Away, Edit, Delete
 
             # Home Team
             with cols[0]:
@@ -242,7 +258,7 @@ def render_view_matches_tab():
                     '>
                         <div style='font-size:1.1rem;font-weight:bold;margin-bottom:4px;'>{time_str}</div>
                         <div style='margin:4px 0;'>{date_display}</div>
-                        <div style='margin:4px 0;'>{render_match_result(match)}</div>
+                        <div style='margin:6px 0;font-size:1rem;font-weight:bold;color:red;'>{render_match_result(match)}</div>
                         <div style='margin-top:4px;'>{render_status_tag(match['status'])}</div>
                     </div>
                     """,
@@ -262,22 +278,28 @@ def render_view_matches_tab():
 
             # Edit Button
             with cols[3]:
+                st.markdown("<div style='display:flex;justify-content:center;'>", unsafe_allow_html=True)
                 if st.button(EDIT_ICON, key=f"edit_match_{match['id']}"):
                     st.session_state.edit_match_id = match['id']
                     st.session_state.show_add_match_form = False
+                st.markdown("</div>", unsafe_allow_html=True)
 
             # Delete Button
             with cols[4]:
+                st.markdown("<div style='display:flex;justify-content:center;'>", unsafe_allow_html=True)
                 if st.button(DELETE_ICON, key=f"delete_match_{match['id']}"):
                     delete_match_by_id(match['id'])
                     st.session_state.status_message = "Match deleted."
                     st.rerun()
+                st.markdown("</div>", unsafe_allow_html=True)
 
             # Inline edit form
             if st.session_state.get("edit_match_id") == match["id"]:
                 render_edit_match(match)
 
+            st.markdown("</div>", unsafe_allow_html=True)  # Close main match wrapper div
             st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+
 
 
 
@@ -292,30 +314,63 @@ def render_edit_match(match):
 
     # Fetch data
     rounds = {r['id']: r['name'] for r in fetch_rounds()}
-    leagues = {l['id']: l['name'] for l in fetch_leagues()}
+    leagues_data = {l['id']: l for l in fetch_leagues()}
+    league = leagues_data.get(match['league_id'])
     teams = {t['id']: t['name'] for t in fetch_teams()}
 
+    if not league:
+        st.error("League details not found.")
+        return
+
+    # Extract league rules
+    can_draw = bool(league['can_be_draw'])
+    two_legs = bool(league['two_legs'])
+    must_have_winner = bool(league['must_have_winner'])
+
     with st.form(key=f"edit_form_{match['id']}"):
-        # Read-only details
         st.text_input("Round", rounds.get(match['round_id'], "Unknown"), disabled=True)
-        st.text_input("League", leagues.get(match['league_id'], "Unknown"), disabled=True)
+        st.text_input("League", league['name'], disabled=True)
         st.text_input("Home Team", teams.get(match['home_team_id'], "Unknown"), disabled=True)
         st.text_input("Away Team", teams.get(match['away_team_id'], "Unknown"), disabled=True)
 
-        # Editable fields
         date_input = st.date_input("Match Date", value=match_dt.date())
         time_input = st.time_input("Match Time", value=match_dt.time())
         combined_datetime = datetime.combine(date_input, time_input)
 
-        status = st.selectbox("Status", ["upcoming", "live","finished", "cancelled"],
-                              index=["upcoming", "live","finished", "cancelled"].index(match['status']))
+        status = st.selectbox("Status", ["upcoming", "live", "finished", "cancelled"],
+                              index=["upcoming", "live", "finished", "cancelled"].index(match['status']))
+
         home_score = st.number_input("Home Score", value=match['home_score'], step=1)
         away_score = st.number_input("Away Score", value=match['away_score'], step=1)
 
-        submitted = st.form_submit_button("Save Changes")
+        penalty_winner = None
+        show_winner_dropdown = False
 
+        if status == "finished" and home_score == away_score:
+            if must_have_winner and not two_legs:
+                show_winner_dropdown = True
+                st.warning("⚠️ This match must have a winner (penalties).")
+            elif must_have_winner and two_legs:
+                all_legs = fetch_legs_by_match_id(match['id'])
+                total_home = sum([leg['home_score'] or 0 for leg in all_legs])
+                total_away = sum([leg['away_score'] or 0 for leg in all_legs])
+                if total_home == total_away and len(all_legs) == 2:
+                    show_winner_dropdown = True
+                    st.warning("⚠️ Aggregate score is draw. You must select a penalty winner.")
+
+        if show_winner_dropdown:
+            penalty_winner = st.selectbox("🏆 Winner on Penalties", [
+                ("", "Select Winner"),
+                (match['home_team_id'], teams[match['home_team_id']]),
+                (match['away_team_id'], teams[match['away_team_id']])
+            ], format_func=lambda x: x[1] if x else "")
+
+        submitted = st.form_submit_button("Save Changes")
         if submitted:
-            # New lightweight update function call
+            if show_winner_dropdown and (not penalty_winner or penalty_winner[0] == ""):
+                st.error("You must select a winner for a draw match that requires one.")
+                return
+
             update_match_partial(
                 match_id=match['id'],
                 match_datetime=combined_datetime.isoformat(),
@@ -323,9 +378,33 @@ def render_edit_match(match):
                 home_score=home_score,
                 away_score=away_score
             )
-            st.success("Match updated successfully!")
+
+            # Compute winner for leg
+            winner_team_id = None
+            if status == "finished":
+                if home_score > away_score:
+                    winner_team_id = match['home_team_id']
+                elif away_score > home_score:
+                    winner_team_id = match['away_team_id']
+                elif show_winner_dropdown and penalty_winner and penalty_winner[0] != "":
+                    winner_team_id = penalty_winner[0]
+
+            insert_or_replace_leg(
+                match_id=match['id'],
+                leg_number=1,
+                leg_date=combined_datetime.isoformat(),
+                home_score=home_score,
+                away_score=away_score,
+                can_draw=can_draw,
+                winner_team_id=winner_team_id,
+                notes="updated from match edit"
+            )
+
+            st.success("Match updated successfully with leg results!")
             st.session_state.edit_match_id = None
             st.rerun()
+
+
 
 
 
@@ -354,8 +433,23 @@ def render_match_result(match):
         elif home < away:
             result = f"<span style='color:red;'>{home} - {away} 🏆</span>"
         else:
-            result = f"<span style='color:orange;'>🤝 {home} - {away}</span>"
+            # Check for penalty winner
+            legs = fetch_legs_by_match_id(match['id'])
+            winner_team_id = None
+            for leg in legs:
+                if leg['winner_team_id']:
+                    winner_team_id = leg['winner_team_id']
+                    break
+
+            if winner_team_id == match['home_team_id']:
+                result = f"<span style='color:green;'>🤝 {home} - {away} (🏆 Home wins on penalties)</span>"
+            elif winner_team_id == match['away_team_id']:
+                result = f"<span style='color:red;'>🤝 {home} - {away} (🏆 Away wins on penalties)</span>"
+            else:
+                result = f"<span style='color:orange;'>🤝 {home} - {away}</span>"
+
         return f"<div style='font-size:1.5rem; font-weight:bold;'>{result}</div>"
     return "<div style='color:#888;'>Not Available</div>"
+
 
 

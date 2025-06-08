@@ -266,7 +266,7 @@ def render_add_team_form(leagues):
         name = st.text_input("Name")
         league_options = {f"{l['name']} ({l['country']})": l['id'] for l in leagues}
         selected_leagues = st.multiselect("Leagues", options=list(league_options.keys()))
-        nationalities = ["Europe", "Spain", "England", "Germany", "France", "South America", "Africa", "Asia", "Egypt","Others"]
+        nationalities = ["Europe", "Spain", "England", "Germany", "France","Italy", "South America", "Africa", "Asia", "Egypt","Others"]
         nationality = st.selectbox("Nationality", nationalities)
         logo_file = st.file_uploader("Upload Logo (optional)", type=['png', 'jpg', 'jpeg'])
 
@@ -295,7 +295,7 @@ def render_edit_team_form(team, leagues):
         default_leagues = [k for k, v in league_options.items() if v in team_league_ids]
         selected_leagues = st.multiselect("Leagues", options=list(league_options.keys()), default=default_leagues)
 
-        nationalities = ["Europe", "Spain", "England", "Germany", "France", "South America", "Africa", "Asia", "Egypt"]
+        nationalities = ["Europe", "Spain", "England", "Germany", "France","Italy", "South America", "Africa", "Asia", "Egypt","Others"]
 
         # Safely get nationality index
         team_nat = team.get("nationality", "Europe")
