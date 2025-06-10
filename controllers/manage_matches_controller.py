@@ -2,6 +2,7 @@
 from db import get_connection
 from datetime import datetime, timedelta
 from utils import execute_query, fetch_one, fetch_all
+import streamlit as st
 import sqlite3
 def execute_query(query, params=()):
     conn = get_connection()
@@ -77,6 +78,8 @@ def get_round_by_date(match_date):
         "SELECT id FROM rounds WHERE start_date <= ? AND end_date >= ?", 
         (match_date, match_date)
     )
+    
+
 
 def is_match_duplicate(round_id, home_team_id, away_team_id):
     return fetch_one("""
@@ -84,24 +87,25 @@ def is_match_duplicate(round_id, home_team_id, away_team_id):
         WHERE round_id = ? AND home_team_id = ? AND away_team_id = ?
     """, (round_id, home_team_id, away_team_id)) is not None
 
-def add_match(round_id, league_id, home_team_id, away_team_id, match_datetime):
+def add_match(round_id, league_id, home_team_id, away_team_id, match_datetime, stage_id):
     query_check = """
         SELECT id FROM matches
         WHERE round_id = ? AND home_team_id = ? AND away_team_id = ?
         LIMIT 1;
     """
     existing = fetch_one(query_check, (round_id, home_team_id, away_team_id))
-    print("DEBUG: existing match check result:", existing)  # debug
+    print("DEBUG: existing match check result:", existing)
 
     if existing:
         return False, "⚠️ Match already exists for this round."
 
     query_insert = """
-        INSERT INTO matches (round_id, league_id, home_team_id, away_team_id, match_datetime)
-        VALUES (?, ?, ?, ?, ?);
+        INSERT INTO matches (round_id, league_id, home_team_id, away_team_id, match_datetime, stage_id)
+        VALUES (?, ?, ?, ?, ?, ?);
     """
-    execute_query(query_insert, (round_id, league_id, home_team_id, away_team_id, match_datetime))
+    execute_query(query_insert, (round_id, league_id, home_team_id, away_team_id, match_datetime, stage_id))
     return True, "✅ Match added successfully."
+
 
 
 
@@ -208,6 +212,44 @@ def fetch_rounds():
     """
     return fetch_all(query)
 
+def rename_round(round_id, new_name):
+    query = "UPDATE rounds SET name = ? WHERE id = ?"
+    execute_query(query, (new_name, round_id))
+
+def reorganize_rounds_by_date():
+    rounds = fetch_all("SELECT id, name, start_date FROM rounds")
+    round_with_matches = []
+
+    for rnd in rounds:
+        matches = fetch_matches_by_round(rnd['id'])
+
+        if matches:
+            try:
+                # Use round's own start_date for sorting
+                start_date = datetime.strptime(rnd['start_date'], "%Y-%m-%d")
+                round_with_matches.append({
+                    "id": rnd["id"],
+                    "old_name": rnd["name"],
+                    "start_date": start_date
+                })
+            except Exception as e:
+                print(f"⛔ Error parsing start_date in round {rnd['name']}: {e}")
+        else:
+            # No matches, safe to delete
+            delete_round(rnd["id"])
+            print(f"🗑️ Deleted empty round: {rnd['name']}")
+
+    # Sort rounds by start_date and rename
+    round_with_matches.sort(key=lambda r: r["start_date"])
+    for idx, rnd in enumerate(round_with_matches, start=1):
+        new_name = f"Round {idx}"
+        rename_round(rnd["id"], new_name)
+        print(f"🔄 Renamed '{rnd['old_name']}' ➜ '{new_name}'")
+
+    st.success("✅ Rounds have been safely renamed and cleaned up.")
+
+
+
 def fetch_matches_by_round(round_id):
     query = """
         SELECT
@@ -216,6 +258,7 @@ def fetch_matches_by_round(round_id):
             m.status,
             m.home_score,
             m.away_score,
+            m.penalty_winner,
 
             home.id AS home_team_id,
             home.name AS home_team_name,
@@ -229,16 +272,20 @@ def fetch_matches_by_round(round_id):
             l.name AS league_name,
             l.logo_path AS league_logo,
 
-            m.round_id
+            m.round_id,
+            m.stage_id,
+            s.name AS stage_name  -- get stage name
 
         FROM matches m
         JOIN teams home ON m.home_team_id = home.id
         JOIN teams away ON m.away_team_id = away.id
         JOIN leagues l ON m.league_id = l.id
+        JOIN stages s ON m.stage_id = s.id  -- join stages table
         WHERE m.round_id = ?
         ORDER BY l.name ASC, m.match_datetime ASC
     """
     return fetch_all(query, (round_id,))
+
 
 
 def delete_match_by_id(match_id):
@@ -248,22 +295,30 @@ def delete_match_by_id(match_id):
     """
     execute_query(query, (match_id,))
     
-def update_match_partial(match_id, match_datetime, status, home_score, away_score):
+def delete_round(round_id):
+    query = """
+        DELETE FROM rounds 
+        WHERE id = ?
+    """
+    execute_query(query, (round_id,))
+    
+def update_match_partial(match_id, match_datetime, status, home_score, away_score, penalty_winner=None):
     query = """
         UPDATE matches
         SET 
             match_datetime = ?,
             status = ?,
             home_score = ?,
-            away_score = ?
+            away_score = ?,
+            penalty_winner = ?
         WHERE id = ?
     """
-    params = (match_datetime, status, home_score, away_score, match_id)
+    params = (match_datetime, status, home_score, away_score, penalty_winner, match_id)
     execute_query(query, params)
 
 def fetch_leagues():
     query = """
-        SELECT id, name, logo_path, can_be_draw, two_legs, must_have_winner
+        SELECT id, name, logo_path
         FROM leagues
     """
     return fetch_all(query)
@@ -311,5 +366,74 @@ def insert_or_replace_leg(match_id, leg_number, leg_date, home_score, away_score
     execute_query(query, params)
 
 
+def fetch_stage_by_id(stage_id):
+    if stage_id is None:
+        return None  # Avoid querying with None
+    
+    query = """
+        SELECT id, name, must_have_winner, two_legs, can_be_draw
+        FROM stages
+        WHERE id = ?
+        LIMIT 1;
+    """
+    result = fetch_one(query, (stage_id,))
+    return result
 
-        
+def fetch_match_by_id(match_id):
+    query = """
+        SELECT *
+        FROM matches
+        WHERE id = ?
+    """
+    return fetch_one(query, (match_id,))
+
+def fetch_team_by_id(team_id):
+    query = """
+        SELECT *
+        FROM teams
+        WHERE id = ?
+    """
+    return fetch_one(query, (team_id,))
+
+
+def handle_two_leg_match_info(match_id):
+    # Fetch two-leg tie data
+    query = """
+        SELECT first_leg_match_id, second_leg_match_id
+        FROM two_legged_ties
+        WHERE first_leg_match_id = ? OR second_leg_match_id = ?
+    """
+    result = fetch_one(query, (match_id, match_id))
+
+    if not result:
+        st.warning("⚠️ This match is marked as two-leg, but no tie data found.")
+        return
+
+    first_leg_id = result['first_leg_match_id']
+    second_leg_id = result['second_leg_match_id']
+
+    # Case: Current match is the first leg
+    if match_id == first_leg_id:
+        st.info("🕹️ This is the **First Leg** of a two-leg tie. Result will influence the second leg.")
+    
+    # Case: Current match is the second leg
+    elif match_id == second_leg_id:
+        first_leg = fetch_match_by_id(first_leg_id)
+
+        if first_leg:
+            home_team = fetch_team_by_id(first_leg['home_team_id'])['name']
+            away_team = fetch_team_by_id(first_leg['away_team_id'])['name']
+            home_score = first_leg['home_score']
+            away_score = first_leg['away_score']
+
+            st.markdown(
+                f"""
+                🧮 **Second Leg Match**
+                <br>📊 First leg result: <span style='color:blue; font-weight:bold;'>{home_team} {home_score} - {away_score} {away_team}</span>
+                """,
+                unsafe_allow_html=True
+            )
+            return int(home_score), int(away_score)
+        else:
+            st.warning("⚠️ Unable to retrieve first leg match details.")
+            return None, None

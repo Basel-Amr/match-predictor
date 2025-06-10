@@ -1,5 +1,6 @@
 from db import get_connection
 from utils import execute_query, fetch_one, fetch_all
+from utils_prediction import calculate_prediction_score
 
 def fetch_all_players():
     conn = get_connection()
@@ -64,8 +65,9 @@ def upsert_prediction(player_id, match_id, predicted_home_score, predicted_away_
     if exists:
         query = """
         UPDATE predictions
-        SET predicted_home_score = ?, predicted_away_score = ?, predicted_penalty_winner = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE player_id = ? AND match_id = ?
+        SET predicted_home_score = ?, predicted_away_score = ?, predicted_penalty_winner = ?
+        WHERE player_id = ? AND match_id = ?;
+
         """
         cursor.execute(query, (predicted_home_score, predicted_away_score, predicted_penalty_winner, player_id, match_id))
     else:
@@ -81,15 +83,17 @@ def upsert_prediction(player_id, match_id, predicted_home_score, predicted_away_
 def update_scores_for_match(match_id):
     # Get match details
     match_query = "SELECT * FROM matches WHERE id = ?;"
-    match = fetch_one(match_query, (match_id,))
+    match_row = fetch_one(match_query, (match_id,))
     
-    if not match or match['home_score'] is None or match['away_score'] is None:
+    if not match_row or match_row['home_score'] is None or match_row['away_score'] is None:
         return  # Match not finished
+
+    match = dict(match_row)  # Convert sqlite3.Row to a mutable dictionary
 
     # Optional: add penalty winner info if needed
     match['must_have_winner'] = 1  # <- Get from leagues if needed
     match['can_be_draw'] = 0       # <- same
-    match['actual_penalty_winner'] = fetch_actual_penalty_winner(match_id)  # implement if needed
+    #match['actual_penalty_winner'] = fetch_actual_penalty_winner(match_id)  # implement if needed
 
     # Get all predictions for that match
     pred_query = "SELECT * FROM predictions WHERE match_id = ?;"
@@ -99,3 +103,21 @@ def update_scores_for_match(match_id):
         score = calculate_prediction_score(match, pred)
         update_query = "UPDATE predictions SET score = ? WHERE id = ?;"
         execute_query(update_query, (score, pred['id']))
+
+def fetch_match_by_id(match_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    query = """
+    SELECT m.*, 
+           ht.name AS home_team_name,
+           at.name AS away_team_name
+    FROM matches m
+    JOIN teams ht ON m.home_team_id = ht.id
+    JOIN teams at ON m.away_team_id = at.id
+    WHERE m.id = ?
+    """
+    cursor.execute(query, (match_id,))
+    row = cursor.fetchone()
+    if row:
+        return dict(zip([column[0] for column in cursor.description], row))
+    return None

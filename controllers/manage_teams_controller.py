@@ -61,6 +61,7 @@ def get_teams():
     SELECT 
         t.id, 
         t.name, 
+        t.official_name,
         t.logo_path,
         t.nationality,
         GROUP_CONCAT(l.name, ', ') AS leagues
@@ -72,7 +73,7 @@ def get_teams():
     return execute_query(query, fetch_all=True)
 
 
-def add_team(name, league_ids, logo_file, nationality="Europe"):
+def add_team(name, league_ids, logo_file, nationality="England", Official_name="None"):
     if not league_ids:
         raise ValueError("At least one league must be selected")
 
@@ -80,10 +81,10 @@ def add_team(name, league_ids, logo_file, nationality="Europe"):
     primary_league_id = league_ids[0]
 
     query = """
-        INSERT INTO teams (name, logo_path, league_id, nationality)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO teams (name, logo_path, league_id, nationality, Official_name)
+        VALUES (?, ?, ?, ?, ?)
     """
-    team_id = execute_query(query, (name, logo_path, primary_league_id, nationality), commit=True, return_lastrowid=True)
+    team_id = execute_query(query, (name, logo_path, primary_league_id, nationality, Official_name), commit=True, return_lastrowid=True)
 
     for league_id in league_ids:
         execute_query(
@@ -99,7 +100,7 @@ def get_team_logo_path(team_id):
     result = execute_query("SELECT logo_path FROM teams WHERE id = ?", (team_id,), fetch_all=False)
     return result.get('logo_path') if result else None
 
-def update_team(team_id, name, league_ids, logo_file=None, nationality="Europe"):
+def update_team(team_id, name, league_ids, logo_file=None, nationality="Europe",Offical_name="None"):
     logo_path = save_uploaded_file(logo_file) if logo_file else get_team_logo_path(team_id)
 
     query = "UPDATE teams SET name = ?, logo_path = ?, nationality = ? WHERE id = ?"

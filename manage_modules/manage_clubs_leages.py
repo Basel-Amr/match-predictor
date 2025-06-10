@@ -6,12 +6,15 @@ import os
 # )
 from controllers.manage_leagues_controller import (
     save_uploaded_file,get_leagues,add_league, 
-    update_league, delete_league
+    update_league, delete_league,
+     update_league, get_stages_by_league, 
+     update_stage, delete_stage, add_stage
     )
 from controllers.manage_teams_controller import (
     get_teams, add_team, update_team, delete_team, get_team_by_id
 )
-                            
+
+from render_helpers.render_leagues import render_edit_league_form, render_add_league_form, render_league_list   
 LEAGUE_ICON = "🏆"
 TEAM_ICON = "⚽"
 EDIT_ICON = "✏️"
@@ -146,6 +149,8 @@ def local_css():
         </style>
         """, unsafe_allow_html=True,
     )
+    
+    
 def render_league_management():
     st.markdown(f'<h1 class="page-title">{LEAGUE_ICON} League Management</h1>', unsafe_allow_html=True)
 
@@ -168,94 +173,7 @@ def render_league_management():
     if st.session_state.show_add_league_form:
         render_add_league_form()
 
-def render_league_list(leagues):
-    st.markdown(
-        """
-        <style>
-            .league-container {
-                margin: auto;
-                width: 90%;
-                padding: 20px;
-            }
 
-            .table-header {
-                font-weight: bold;
-                font-size: 16px;
-                padding-bottom: 5px;
-                border-bottom: 2px solid #999;
-                text-align: center;
-            }
-
-            .centered {
-                text-align: center;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                height: 100%;
-            }
-
-            .logo-img {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                height: 100%;
-            }
-
-            .stButton > button {
-                margin: auto;
-                display: block;
-            }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-    st.markdown('<div class="league-container">', unsafe_allow_html=True)
-
-    headers = ["Logo", "Name", "Country", "Can be draw", "Two legs", "Must have winner", EDIT_ICON, DELETE_ICON]
-    cols = st.columns([1, 1, 1, 1, 1, 1, 0.5, 0.5])
-    for col, header in zip(cols, headers):
-        col.markdown(f'<div class="table-header">{header}</div>', unsafe_allow_html=True)
-
-    for league in leagues:
-        st.markdown('<div class="league-row">', unsafe_allow_html=True)
-        cols = st.columns([1, 1, 1, 1, 1, 1, 0.5, 0.5])
-
-        # Logo centered
-        with cols[0]:
-            if league.get("logo_path"):
-                st.markdown('<div class="logo-img">', unsafe_allow_html=True)
-                st.image(league["logo_path"], width=40)
-                st.markdown('</div>', unsafe_allow_html=True)
-            else:
-                st.markdown('<div class="centered">—</div>', unsafe_allow_html=True)
-
-        # Text fields and flags
-        cols[1].markdown(f'<div class="centered">{league["name"]}</div>', unsafe_allow_html=True)
-        cols[2].markdown(f'<div class="centered">{league["country"]}</div>', unsafe_allow_html=True)
-        cols[3].markdown(f'<div class="centered">{"✅" if league["can_be_draw"] else "❌"}</div>', unsafe_allow_html=True)
-        cols[4].markdown(f'<div class="centered">{"✅" if league["two_legs"] else "❌"}</div>', unsafe_allow_html=True)
-        cols[5].markdown(f'<div class="centered">{"✅" if league["must_have_winner"] else "❌"}</div>', unsafe_allow_html=True)
-
-        # Action buttons centered
-        with cols[6]:
-            st.markdown('<div class="centered">', unsafe_allow_html=True)
-            if st.button(EDIT_ICON, key=f"edit_league_{league['id']}"):
-                st.session_state.edit_league_id = league['id']
-                st.session_state.show_add_league_form = False
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        with cols[7]:
-            st.markdown('<div class="centered">', unsafe_allow_html=True)
-            if st.button(DELETE_ICON, key=f"delete_league_{league['id']}"):
-                delete_league(league['id'])
-                st.session_state.status_message = "League deleted."
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
 
 ##########################################################################################################
@@ -264,6 +182,7 @@ def render_add_team_form(leagues):
     st.markdown("### Add New Team")
     with st.form("add_team_form"):
         name = st.text_input("Name")
+        official_name = st.text_input("official_name")
         league_options = {f"{l['name']} ({l['country']})": l['id'] for l in leagues}
         selected_leagues = st.multiselect("Leagues", options=list(league_options.keys()))
         nationalities = ["Europe", "Spain", "England", "Germany", "France","Italy", "South America", "Africa", "Asia", "Egypt","Others"]
@@ -272,7 +191,7 @@ def render_add_team_form(leagues):
 
         if st.form_submit_button("Add Team"):
             league_ids = [league_options[league] for league in selected_leagues]
-            add_team(name, league_ids, logo_file, nationality)
+            add_team(name, league_ids, logo_file, nationality,official_name)
             st.session_state.status_message = "✅ Team added successfully."
             st.session_state.show_add_team_form = False
             st.rerun()
@@ -287,7 +206,7 @@ def render_edit_team_form(team, leagues):
             st.image(team["logo_path"], width=150)  # adjust width as needed
 
         name = st.text_input("Name", team["name"])
-        
+        official_name = st.text_input("official_name")
         league_options = {f"{l['name']} ({l['country']})": l['id'] for l in leagues}
 
         # Handle preselected leagues
@@ -311,7 +230,7 @@ def render_edit_team_form(team, leagues):
         if st.form_submit_button("Update Team"):
             league_ids = [league_options[league] for league in selected_leagues]
             # If no new logo uploaded, pass None or old path accordingly
-            update_team(team["id"], name, league_ids, logo_file, nationality)
+            update_team(team["id"], name, league_ids, logo_file, nationality, official_name)
             st.session_state.status_message = "✅ Team updated successfully."
             st.session_state.edit_team_id = None
             st.rerun()
@@ -429,7 +348,7 @@ def render_team_management():
 
     # Select nationality dropdown
     selected_nat_display = st.selectbox("Select Nationality to View Teams", options=nationality_names)
-    selected_nat = selected_nat_display.split(" (")[0]
+    selected_nat = selected_nat_display.split(" (")[0] if selected_nat_display else ""
     teams_to_display = nationality_groups.get(selected_nat, [])
 
     st.markdown('<div class="league-container">', unsafe_allow_html=True)
