@@ -19,19 +19,19 @@ EDIT_ICON = "✏️"  # Pencil emoji for edit
 DELETE_ICON = "🗑️"  # Trash can emoji for delete
 
 def render_prediction_result(pred, match_status):
-    if pred is None:
+    if match_status.lower() != "finished":
         return """
-            <div style='color: #6c757d; font-weight: 500; animation: popFade 0.6s; text-align:center;'>
-                ❌ <span style='font-size: 1.1em;'>No Prediction</span><br>
-                <b>+0 pts</b>
+            <div style='color: #6c757d; font-weight: 500; text-align:center; animation: fadeIn 0.6s;'>
+                ⏳ <span style='font-size: 1.1em;'>Match in Progress</span><br>
+                <b>Points will be revealed after the final whistle! ⚽</b>
             </div>
         """
 
-    if match_status.lower() != "finished":
+    if pred is None:
         return """
-            <div style='color: #0d6efd; font-weight: 500; animation: popFade 0.6s; text-align:center;'>
-                ⏳ <span style='font-size: 1.1em;'>Match Not Finished</span><br>
-                <b>Points Pending</b>
+            <div style='color: #adb5bd; font-weight: 500; text-align:center; animation: fadeIn 0.6s;'>
+                ❌ <span style='font-size: 1.1em;'>No Prediction Made</span><br>
+                <b>+0 pts</b>
             </div>
         """
 
@@ -42,7 +42,6 @@ def render_prediction_result(pred, match_status):
             score = pred['score']
         except (TypeError, KeyError):
             score = 0
-
 
     if score == 0:
         color, emoji, text, pts = "#dc3545", "❌", "Missed it!", "+0 pts"
@@ -60,6 +59,7 @@ def render_prediction_result(pred, match_status):
             {emoji} <span style='font-size: 1.1em;'>{text} <b>{pts}</b></span>
         </div>
     """
+
 
 
 def render_status_tag(status):

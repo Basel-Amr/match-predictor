@@ -107,7 +107,7 @@ def render_deadline(round_name, deadline, match_count, number_of_predicted_match
 
 def render_match_info(match_dt, status, home_score, away_score, prediction, match, return_html=False):
     status_clean = status.title().lower()
-    
+    pred_result = render_prediction_result(prediction,status_clean )
     status_tag = render_status_tag(status_clean)
     match_result = render_match_result(match)
     date_display = render_match_timing(match_dt)
@@ -140,6 +140,7 @@ def render_match_info(match_dt, status, home_score, away_score, prediction, matc
         <div style='margin:4px 0;'>{date_display}</div>
         <div style='margin:6px 0;font-size:1rem;font-weight:bold;color:red;'>{match_result}</div>
         <div style='margin:6px 0;font-size:1rem;font-weight:bold;color:red;'>{prediction_display}</div>
+        <b>{pred_result}</b>
         <div style='margin-top:4px;'>{status_tag}</div>
     </div>
     """

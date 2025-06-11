@@ -26,10 +26,11 @@ def get_all_player_emails():
 
 def send_reminder_email_to_all(round_name, deadline, match_time, match_count, level):
     """
-    Send a friendly and personalized reminder email based on level.
-    Levels: "2days", "1day", or "2hours"
+    Send a customized reminder email based on level.
+    Levels: "2days", "1day", "2hours", or "test"
     """
-    # Define subject and body templates based on reminder level
+    now = datetime.now()
+
     if level == "2days":
         subject = f"⏳ Just 2 Days Left – Get Ready for {round_name}!"
         body_template = """
@@ -39,7 +40,7 @@ The excitement is building! The round **{round_name}** kicks off soon.
 
 🗓 Match Time: {match_time}
 ⏰ Deadline to Predict: {deadline} (2 hours before kickoff)
-📊 Number of Matches: {match_count}
+📊 Matches in this Round: {match_count}
 
 You've still got **2 full days** to make your predictions. Don’t miss out – the leaderboard is waiting!
 
@@ -73,11 +74,31 @@ Deadline: {deadline}
 
 🏁 Let's kick off in style!
 """
+    elif level.lower() == "test":
+        # Dynamically calculate time left
+        time_left = deadline - now
+        days, seconds = time_left.days, time_left.seconds
+        hours = seconds // 3600
+        minutes = (seconds % 3600) // 60
+
+        subject = f"🛠️ TEST Reminder – {round_name}"
+        body_template = f"""
+Hello {{username}} 👋,
+
+This is a **TEST EMAIL** to preview reminders for the round **{round_name}**.
+
+📅 Match Time: {match_time.strftime('%Y-%m-%d %H:%M')}
+⏰ Deadline: {deadline.strftime('%Y-%m-%d %H:%M')}
+⌛ Time Left: {days} days, {hours} hours, and {minutes} minutes
+🧮 Matches to Predict: {match_count}
+
+🚀 Reminder system is working perfectly!
+"""
     else:
         print("⚠️ Invalid reminder level provided.")
         return
 
-    # Format email details
+    # Send Emails
     recipients = get_all_player_emails()
 
     try:
@@ -108,16 +129,3 @@ Deadline: {deadline}
 
 
 
-if __name__ == "__main__":
-    round_name, deadline, match_time, match_count = get_next_round_info()
-    now = datetime.now()
-
-    if now.date() == (deadline - timedelta(days=2)).date():
-        send_reminder_email_to_all(round_name, deadline, match_time, match_count, "2days")
-    elif now.date() == (deadline - timedelta(days=1)).date():
-        send_reminder_email_to_all(round_name, deadline, match_time, match_count, "1day")
-    elif now.strftime("%Y-%m-%d %H:%M") == deadline.strftime("%Y-%m-%d %H:%M"):
-        send_reminder_email_to_all(round_name, deadline, match_time, match_count, "2hours")
-    else:
-        print("Notjing happens")
-        send_reminder_email_to_all(round_name, deadline, match_time, match_count, "2days")
