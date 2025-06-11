@@ -1,18 +1,14 @@
 from db import get_connection
-
+from utils import fetch_one
 
 def calculate_prediction_score(match, prediction):
-    """
-    Calculate score based on prediction and actual match result.
-    If it's a cup match, we may need to check legs and penalties.
-    """
-
     match_id = match['id']
     actual_home = match['home_score']
     actual_away = match['away_score']
     predicted_home = prediction['predicted_home_score']
     predicted_away = prediction['predicted_away_score']
     predicted_winner = prediction['predicted_penalty_winner']
+    actual_penalty_winner_id = match['penalty_winner']
 
     if actual_home is None or actual_away is None:
         return 0  # Match not finished
@@ -30,41 +26,15 @@ def calculate_prediction_score(match, prediction):
     elif actual_result == predicted_result:
         score = 1
 
-    # --- Penalty winner logic ---
-    conn = get_connection()
-    cursor = conn.cursor()
-    #cursor = db_connection.cursor()
-    legs = cursor.execute("SELECT * FROM legs WHERE match_id = ?", (match_id,)).fetchall()
+    # 🔍 Convert actual_penalty_winner ID to team name for comparison
+    actual_penalty_winner_name = None
+    if actual_penalty_winner_id:
+        team_row = fetch_one("SELECT name FROM teams WHERE id = ?", (actual_penalty_winner_id,))
+        if team_row:
+            actual_penalty_winner_name = team_row["name"]
 
-    if not legs:
-        return score  # No legs found
-
-    num_legs = len(legs)
-
-    # If only one leg and it's a draw, check winner_team_id
-    if num_legs == 1:
-        leg = dict(legs[0])
-        if outcome(leg['home_score'], leg['away_score']) == 'draw' and leg['winner_team_id']:
-            # Fetch team name for winner_team_id
-            winner_row = cursor.execute("SELECT name FROM teams WHERE id = ?", (leg['winner_team_id'],)).fetchone()
-            if winner_row:
-                actual_penalty_winner = winner_row[0]
-                if predicted_winner and predicted_winner.lower() == actual_penalty_winner.lower():
-                    score += 1
-
-    # If two legs, check aggregate
-    elif num_legs == 2:
-        total_home = sum(leg['home_score'] for leg in legs)
-        total_away = sum(leg['away_score'] for leg in legs)
-
-        if outcome(total_home, total_away) == 'draw':
-            # Use last leg winner_team_id
-            last_leg = dict(sorted(legs, key=lambda l: l['leg_number'])[-1])
-            if last_leg['winner_team_id']:
-                winner_row = cursor.execute("SELECT name FROM teams WHERE id = ?", (last_leg['winner_team_id'],)).fetchone()
-                if winner_row:
-                    actual_penalty_winner = winner_row[0]
-                    if predicted_winner and predicted_winner.lower() == actual_penalty_winner.lower():
-                        score += 1
+    # ✅ Compare correctly
+    if actual_penalty_winner_name and actual_penalty_winner_name == predicted_winner:
+        score += 1  # Bonus point for correct penalty winner
 
     return score

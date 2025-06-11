@@ -12,11 +12,10 @@ from controllers.manage_matches_controller import (fetch_rounds, fetch_matches_b
                                                    fetch_stage_by_id)
 from controllers.manage_predictions_controller import update_scores_for_match
 from itertools import groupby
-from streamlit_autorefresh import st_autorefresh
 from datetime import datetime, timedelta
 from render_helpers.render_matches_managing import render_manage_matches_tab
 from render_helpers.render_matches_viewer import (render_match_result, render_status_tag,
-                                                 render_edit_match, render_view_matches_tab
+                                                 render_edit_match, render_view_matches_tab, render_stage_tag
                                                 )
 # Icons
 MANAGE_ICON = "🛠️"

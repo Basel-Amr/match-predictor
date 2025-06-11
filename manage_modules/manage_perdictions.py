@@ -1,6 +1,6 @@
 from modules import under_update
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timedelta
 from controllers.manage_predictions_controller import (
     fetch_all_players,
     fetch_grouped_matches,
@@ -12,8 +12,6 @@ from controllers.manage_matches_controller import (fetch_rounds, fetch_matches_b
                                                    fetch_leagues, fetch_teams, change_match_status, insert_or_replace_leg, 
                                                    fetch_legs_by_match_id)
 from itertools import groupby
-from datetime import datetime, timedelta
-
 from render_helpers.render_predictions import render_prediction_input
 MANAGE_ICON = "🛠️"
 VIEW_ICON = "📅"
@@ -37,7 +35,14 @@ def render_prediction_result(pred, match_status):
             </div>
         """
 
-    score = pred.get('score', 0)
+    try:
+        score = pred.get('score', 0)
+    except AttributeError:
+        try:
+            score = pred['score']
+        except (TypeError, KeyError):
+            score = 0
+
 
     if score == 0:
         color, emoji, text, pts = "#dc3545", "❌", "Missed it!", "+0 pts"
@@ -247,5 +252,6 @@ def render():
 
             st.markdown("</div>", unsafe_allow_html=True)
             st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
+
 
 

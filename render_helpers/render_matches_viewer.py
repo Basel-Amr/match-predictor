@@ -11,7 +11,6 @@ from controllers.manage_matches_controller import (fetch_rounds, fetch_matches_b
                                                    fetch_stage_by_id, handle_two_leg_match_info)
 from controllers.manage_predictions_controller import update_scores_for_match
 from itertools import groupby
-from streamlit_autorefresh import st_autorefresh
 from datetime import datetime, timedelta
 from utils import fetch_one, execute_query
 # Icons
@@ -204,7 +203,7 @@ def render_edit_match(match):
             st.info("📢 This is a two-leg match. You may need to handle aggregate scoring.")
 
             # Use the existing function you wrote
-            home_score_leg1, away_score_leg1 = handle_two_leg_match_info(match['id'])
+            home_score_leg1, away_score_leg1, home_team, away_team = handle_two_leg_match_info(match['id'])
 
             if must_have_winner and status == "finished":
                 # Only consider aggregate if this is the second leg
@@ -221,11 +220,27 @@ def render_edit_match(match):
                         # Aggregate score logic using leg1 + current inputs
                         total_home = home_score_leg1 + away_score
                         total_away = away_score_leg1 + home_score
-
-                        st.markdown("## 🛠️ Leg Score Summary")
+                        st.markdown(f"""🧮 **Second Leg Match**
+                        <br>📊 First leg result: <span style='color:blue; font-weight:bold;'>{home_team} {home_score_leg1} - {away_score_leg1} {away_team}</span>
+                        """,
+                        unsafe_allow_html=True
+                        )
                         if total_home == total_away:
                             show_winner_dropdown = True
-                            st.warning("⚠️ Aggregate score is draw. You must select a penalty winner.")
+                            st.markdown(
+                                    f"""
+                                    <div style="background-color:#f1f3f4; padding:20px; border-radius:12px; border-left:6px solid #4a90e2;">
+                                        <h3 style="margin-bottom:10px; color:#0f62fe;">🧮 <u>Aggregate Result</u></h3>
+                                        <p style="font-size:22px; font-weight:600; color:#1f77b4; text-align:center;">
+                                            🔢 <span style="font-size:26px;">{total_home}</span>
+                                            &nbsp;–&nbsp;
+                                            <span style="font-size:26px;">{total_away}</span>
+                                        </p>
+                                    </div>
+                                    """,
+                                    unsafe_allow_html=True
+                                )
+
 
         elif must_have_winner and not two_legs and status == "finished" and home_score == away_score:
             show_winner_dropdown = True
@@ -262,14 +277,15 @@ def render_edit_match(match):
             WHERE first_leg_match_id = ? OR second_leg_match_id = ?
             """, (match['id'], match['id'])
             )
-            execute_query(
-            """
-            UPDATE two_legged_ties
-            SET winner_team_id = ?
-            WHERE id = ?
-            """,
-            (penalty_winner_id, tie['id'])
-            )
+            if tie:
+                execute_query(
+                """
+                UPDATE two_legged_ties
+                SET winner_team_id = ?
+                WHERE id = ?
+                """,
+                (penalty_winner_id, tie['id'])
+                )
 
             st.success("✅ Match updated successfully with leg results and predictions scored!")
             st.session_state.edit_match_id = None
@@ -283,18 +299,6 @@ def render_edit_match(match):
 def render_view_matches_tab():
     st.markdown(f'<div class="emoji-header">{VIEW_ICON} View Matches by Round</div>', unsafe_allow_html=True)
     st.info("Browse and filter scheduled matches based on league and round.")
-
-    # ⚙️ Customizing refresh rate
-    refresh_option = st.selectbox("⚙️ Auto Refresh Interval", ["15 sec", "30 sec", "1 min", "2 min", "5 min"])
-    refresh_map = {
-        "15 sec": 15 * 1000,
-        "30 sec": 30 * 1000,
-        "1 min": 60 * 1000,
-        "2 min": 120 * 1000,
-        "5 min": 300 * 1000
-    }
-    st_autorefresh(interval=refresh_map[refresh_option], key="match_view_autorefresh")
-
     rounds = fetch_rounds()
     if not rounds:
         st.warning("No rounds available.")

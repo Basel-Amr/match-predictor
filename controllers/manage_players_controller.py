@@ -1,7 +1,7 @@
 from db import get_connection
 import hashlib
-from utils import hash_password
-
+from utils import hash_password, execute_query
+import streamlit as st
 
 def get_players(search=""):
     conn = get_connection()
@@ -59,15 +59,22 @@ def add_player(username, email, role, password):
 def update_player(player_id, username, email, role, password=None):
     conn = get_connection()
     cur = conn.cursor()
-    if password:
-        password_hash = hash_password(password)
-        cur.execute("UPDATE players SET username=?, email=?, role=?, password_hash=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                    (username, email, role, password_hash, player_id))
-    else:
-        cur.execute("UPDATE players SET username=?, email=?, role=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                    (username, email, role, player_id))
-    conn.commit()
-    conn.close()
+    try:
+        if password:
+            password_hash = hash_password(password)
+            cur.execute("UPDATE players SET username=?, email=?, role=?, password_hash=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                        (username, email, role, password_hash, player_id))
+        else:
+            cur.execute("UPDATE players SET username=?, email=?, role=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                        (username, email, role, player_id))
+        conn.commit()
+        return True  # ✅ Add this
+    except Exception as e:
+        print(f"❌ update_player error: {e}")
+        return False  # ✅ Add error handling to reflect failure
+    finally:
+        conn.close()
+
 
 def delete_player(player_id):
     conn = get_connection()
@@ -75,3 +82,24 @@ def delete_player(player_id):
     cur.execute("DELETE FROM players WHERE id=?", (player_id,))
     conn.commit()
     conn.close()
+
+def update_achievements(player_id, total_leagues_won, total_cups_won):
+    st.write(f"🔍 Updating achievements for player_id: {player_id}")
+    st.write(f"🏆 Leagues Won: {total_leagues_won}, 🏆 Cups Won: {total_cups_won}")
+
+    query = """
+    INSERT INTO achievements (player_id, total_leagues_won, total_cups_won)
+    VALUES (?, ?, ?)
+    ON CONFLICT(player_id) DO UPDATE SET
+        total_leagues_won = excluded.total_leagues_won,
+        total_cups_won = excluded.total_cups_won,
+        updated_at = CURRENT_TIMESTAMP;
+    """
+    try:
+        execute_query(query, (player_id, total_leagues_won, total_cups_won))
+        st.success("✅ Achievements updated in the database.")
+        return True
+    except Exception as e:
+        st.error(f"❌ Error updating achievements: {e}")
+        return False
+

@@ -289,11 +289,31 @@ def fetch_matches_by_round(round_id):
 
 
 def delete_match_by_id(match_id):
-    query = """
-        DELETE FROM matches 
-        WHERE id = ?
-    """
-    execute_query(query, (match_id,))
+    # Get the round_id of the match before deleting
+    query_get_round = "SELECT round_id FROM matches WHERE id = ?"
+    result = fetch_one(query_get_round, (match_id,))
+    if not result:
+        print("Match not found.")
+        return
+    round_id = result['round_id']
+
+    # Manually delete predictions related to the match
+    query_delete_predictions = "DELETE FROM predictions WHERE match_id = ?"
+    execute_query(query_delete_predictions, (match_id,))
+
+    # Delete the match
+    query_delete_match = "DELETE FROM matches WHERE id = ?"
+    execute_query(query_delete_match, (match_id,))
+
+    # Check if any matches are still in this round
+    query_check_round_empty = "SELECT COUNT(*) AS match_count FROM matches WHERE round_id = ?"
+    count_result = fetch_one(query_check_round_empty, (round_id,))
+    if count_result['match_count'] == 0:
+        # Delete the round since it's now empty
+        query_delete_round = "DELETE FROM rounds WHERE id = ?"
+        execute_query(query_delete_round, (round_id,))
+
+
     
 def delete_round(round_id):
     query = """
@@ -426,14 +446,14 @@ def handle_two_leg_match_info(match_id):
             home_score = first_leg['home_score']
             away_score = first_leg['away_score']
 
-            st.markdown(
-                f"""
-                🧮 **Second Leg Match**
-                <br>📊 First leg result: <span style='color:blue; font-weight:bold;'>{home_team} {home_score} - {away_score} {away_team}</span>
-                """,
-                unsafe_allow_html=True
-            )
-            return int(home_score), int(away_score)
+            # st.markdown(
+            #     f"""
+            #     🧮 **Second Leg Match**
+            #     <br>📊 First leg result: <span style='color:blue; font-weight:bold;'>{home_team} {home_score} - {away_score} {away_team}</span>
+            #     """,
+            #     unsafe_allow_html=True
+            # )
+            return int(home_score), int(away_score), str(home_team), str(away_team)
         else:
             st.warning("⚠️ Unable to retrieve first leg match details.")
-            return None, None
+    return 0, 0

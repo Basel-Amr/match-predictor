@@ -1,10 +1,12 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
 import auth
-
+from controllers.predictions_controllers import format_time_left, get_next_round_info, get_predicted_match_count
 from modules import profile, predictions, leaderboard, achievement, manage, cup
-
+from streamlit_autorefresh import st_autorefresh
+from datetime import datetime, timedelta
 from controllers.players_controller import get_player_id_by_username
+from send_email import send_reminder_email_to_all
 
 # Page Configuration
 st.set_page_config(
@@ -60,9 +62,27 @@ if "role" not in st.session_state:
 
 # Main Dashboard (Tabs)
 def main_page():
+    # Refresh every 5000 milliseconds (1 second)
+    st_autorefresh(interval=5000, limit=None, key="refresh")
     show_tabs = ["Profile", "Predictions", "Leaderboard", "Achievement", "Cup"]
     icons = ["person-circle", "lightning", "trophy", "award", "trophy"]
-
+    round_name, deadline, match_time, match_count = get_next_round_info()
+    # Convert strings to datetime if needed
+    if isinstance(deadline, str):
+        deadline = datetime.fromisoformat(deadline)
+    if isinstance(match_time, str):
+        match_time = datetime.fromisoformat(match_time)
+    now = datetime.now()
+    if now.date() == (deadline - timedelta(days=2)).date():
+        send_reminder_email_to_all(round_name, deadline, match_time, match_count, "2days")
+    elif now.date() == (deadline - timedelta(days=1)).date():
+        send_reminder_email_to_all(round_name, deadline, match_time, match_count, "1day")
+    elif now.strftime("%Y-%m-%d %H:%M") == deadline.strftime("%Y-%m-%d %H:%M"):
+        send_reminder_email_to_all(round_name, deadline, match_time, match_count, "2hours")
+        
+    if not round_name:
+        st.warning("No upcoming rounds found.")
+        return
 
     if st.session_state.role == "admin":
         show_tabs.append("Manage")
@@ -98,19 +118,18 @@ def main_page():
             }
         }
     )
-
+    player_id = get_player_id_by_username(st.session_state.username)
     if selected_tab == "Profile":
-        player_id = get_player_id_by_username(st.session_state.username)
         profile.render(player_id)
         #profile.render(st.session_state.username)
     elif selected_tab == "Predictions":
-        predictions.render()
+        predictions.render(player_id)
     elif selected_tab == "Leaderboard":
-        leaderboard.render()
+        leaderboard.render(player_id)
     elif selected_tab == "Achievement":
-        achievement.render()
+        achievement.render(player_id)
     elif selected_tab == "Cup":
-        cup.render()
+        cup.render(player_id)
     elif selected_tab == "Manage":
         manage.render()
 

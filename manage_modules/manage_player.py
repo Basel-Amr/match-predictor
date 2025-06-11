@@ -1,5 +1,6 @@
 import streamlit as st
 from controllers import manage_players_controller as mpc
+from utils import fetch_one
 from PIL import Image
 import os
 import hashlib
@@ -106,32 +107,52 @@ def show_add_edit_modal():
     st.header("Edit Player" if is_editing else "Add New Player")
 
     with st.form("player_form"):
+        # --- Input Fields ---
         username = st.text_input("Username", value=player["username"] if is_editing else "")
         email = st.text_input("Email", value=player["email"] if is_editing else "")
-        role = st.selectbox("Role", ["player", "admin"], index=0 if not is_editing else (1 if player["role"] == "admin" else 0))
+        role = st.selectbox("Role", ["player", "admin"],
+                            index=0 if not is_editing else (1 if player["role"] == "admin" else 0))
         password = st.text_input("Password (leave blank to keep current)", type="password")
         avatar_file = st.file_uploader("Upload Avatar", type=["png", "jpg", "jpeg"])
 
-        submitted = st.form_submit_button("Save")
-        canceled = st.form_submit_button("Cancel")
+        # --- Achievement Fields (if editing) ---
+        achievements = fetch_one("SELECT total_leagues_won, total_cups_won FROM achievements WHERE player_id = ?",
+                                 (player["id"],)) if is_editing else None
 
-        if submitted:
-            if is_editing:
-                success = mpc.update_player(player["id"], username, email, role, password)
-                if success:
-                    st.success("Player updated!")
-                else:
-                    st.error("Failed to update player.")
+        total_leagues_won = st.number_input("Leagues Won", min_value=0,
+                                            value=achievements["total_leagues_won"] if achievements else 0)
+        total_cups_won = st.number_input("Cups Won", min_value=0,
+                                         value=achievements["total_cups_won"] if achievements else 0)
+
+        # --- Form Submission ---
+        col1, col2 = st.columns(2)
+        with col1:
+            submitted = st.form_submit_button("Save")
+        with col2:
+            canceled = st.form_submit_button("Cancel")
+
+    # --- After Form Submission ---
+    if canceled:
+        st.session_state["show_add_edit_modal"] = False
+        st.session_state["editing_player"] = None  # Clear the current player being edited
+        st.rerun()
+
+    if submitted:
+        if is_editing:
+            success = mpc.update_player(player["id"], username, email, role, password)
+            if success:
+                mpc.update_achievements(player["id"], total_leagues_won, total_cups_won)
+                st.success("Player and achievements updated!")
             else:
-                new_id = mpc.add_player(username, email, role, password)
-                if new_id:
-                    st.success("Player added!")
-                else:
-                    st.error("Failed to add player.")
+                st.error("Failed to update player.")
+        else:
+            new_id = mpc.add_player(username, email, role, password)
+            if new_id:
+                mpc.update_achievements(new_id, total_leagues_won, total_cups_won)
+                st.success("Player and achievements added!")
+            else:
+                st.error("Failed to add player.")
 
-            st.session_state["show_add_edit_modal"] = False
-            st.rerun()
-
-        if canceled:
-            st.session_state["show_add_edit_modal"] = False
-            st.rerun()
+        st.session_state["show_add_edit_modal"] = False
+        st.session_state["editing_player"] = None
+        st.rerun()
