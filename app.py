@@ -68,17 +68,17 @@ def main_page():
     icons = ["person-circle", "lightning", "trophy", "award", "trophy"]
     round_name, deadline, match_time, match_count = get_next_round_info()
     # Convert strings to datetime if needed
-    if isinstance(deadline, str):
-        deadline = datetime.fromisoformat(deadline)
-    if isinstance(match_time, str):
-        match_time = datetime.fromisoformat(match_time)
-    now = datetime.now()
-    if now.date() == (deadline - timedelta(days=2)).date():
-        send_reminder_email_to_all(round_name, deadline, match_time, match_count, "2days")
-    elif now.date() == (deadline - timedelta(days=1)).date():
-        send_reminder_email_to_all(round_name, deadline, match_time, match_count, "1day")
-    elif now.strftime("%Y-%m-%d %H:%M") == deadline.strftime("%Y-%m-%d %H:%M"):
-        send_reminder_email_to_all(round_name, deadline, match_time, match_count, "2hours")
+    # if isinstance(deadline, str):
+    #     deadline = datetime.fromisoformat(deadline)
+    # if isinstance(match_time, str):
+    #     match_time = datetime.fromisoformat(match_time)
+    # now = datetime.now()
+    # if now.date() == (deadline - timedelta(days=2)).date():
+    #     send_reminder_email_to_all(round_name, deadline, match_time, match_count, "2days")
+    # elif now.date() == (deadline - timedelta(days=1)).date():
+    #     send_reminder_email_to_all(round_name, deadline, match_time, match_count, "1day")
+    # elif now.strftime("%Y-%m-%d %H:%M") == deadline.strftime("%Y-%m-%d %H:%M"):
+    #     send_reminder_email_to_all(round_name, deadline, match_time, match_count, "2hours")
         
     if not round_name:
         st.warning("No upcoming rounds found.")
