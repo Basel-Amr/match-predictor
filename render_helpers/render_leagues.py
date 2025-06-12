@@ -231,10 +231,22 @@ def render_league_list(leagues):
 
         # Logo centered
         with cols[0]:
-            if league.get("logo_path"):
-                st.markdown('<div class="logo-img">', unsafe_allow_html=True)
-                st.image(league["logo_path"], width=40)
-                st.markdown('</div>', unsafe_allow_html=True)
+            logo_path = league.get("logo_path")
+            
+            if logo_path:
+                try:
+                    st.markdown('<div class="logo-img">', unsafe_allow_html=True)
+                    st.image(logo_path, width=40)
+                    st.markdown('</div>', unsafe_allow_html=True)
+                except Exception as e:
+                    # Fallback if image can't be loaded
+                    st.markdown(f"""
+                        <div class="centered" style="color: gray;">
+                            ⚠️ Image not found
+                        </div>
+                    """, unsafe_allow_html=True)
+                    # Optional: log the error
+                    print(f"Error loading image: {logo_path} -> {e}")
             else:
                 st.markdown('<div class="centered">—</div>', unsafe_allow_html=True)
 
