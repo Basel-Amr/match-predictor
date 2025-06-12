@@ -196,7 +196,7 @@ def render_match_card(match, player_id, round_id):
         
     with cols[3]:
         if deadline and now < deadline:
-            if st.button("🔮 Predict", key=f"predict_{match_id}"):
+            if st.button("🔮 Predict", key=f"predict_{match_id}", help="This Button is used to predict the result"):
                 st.session_state.predict_match_id = match_id
                 st.session_state.show_add_match_form = False
         else:
