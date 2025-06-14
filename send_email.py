@@ -29,7 +29,8 @@ def send_reminder_email_to_all(round_name, deadline, match_time, match_count, le
     Send a customized reminder email based on level.
     Levels: "2days", "1day", "2hours", or "test"
     """
-    now = datetime.now()
+    tz = ZoneInfo("Africa/Cairo")
+    now = datetime.now(tz)
 
     if level == "2days":
         subject = f"⏳ Just 2 Days Left – Get Ready for {round_name}!"
