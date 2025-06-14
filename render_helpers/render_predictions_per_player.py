@@ -25,7 +25,6 @@ def render_deadline(round_name, deadline, match_count, number_of_predicted_match
     days = time_left.days
     hours, remainder = divmod(time_left.seconds, 3600)
     minutes, _ = divmod(remainder, 60)
-
     # Prediction percentage
     prediction_ratio = number_of_predicted_matches / match_count if match_count else 0
     progress_bar = int(prediction_ratio * 100)

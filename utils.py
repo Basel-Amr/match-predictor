@@ -3,6 +3,7 @@ import hashlib
 import bcrypt
 import streamlit as st
 from db import get_connection
+from datetime import datetime, timedelta
 
 def hash_password(password: str) -> bytes:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt())
@@ -260,3 +261,9 @@ def insert_two_legged_tie(first_leg_id, second_leg_id):
         connection.commit()  # Commit using the same connection
     except Exception as e:
         st.error(f"❌ Error saving two-legged tie: {e}")
+
+
+def should_trigger_reminder(target_time, now=None, margin_minutes=1):
+    now = now or datetime.now()
+    delta = abs((now - target_time).total_seconds())
+    return delta <= margin_minutes * 60

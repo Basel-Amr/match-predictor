@@ -9,33 +9,32 @@ from db import get_connection
 def get_next_round_info():
     now = datetime.now()
 
-    # Step 1: Get next round by comparing today with start_date
-    round_row = fetch_one("""
-        SELECT * FROM rounds
-        WHERE start_date > ?
-        ORDER BY start_date ASC
+    # Step 1: Find the earliest match that is in the future
+    match = fetch_one("""
+        SELECT m.*, r.name AS round_name, r.id AS round_id
+        FROM matches m
+        JOIN rounds r ON m.round_id = r.id
+        WHERE m.match_datetime > ?
+        ORDER BY m.match_datetime ASC
         LIMIT 1
     """, (now.isoformat(),))
 
-    if not round_row:
-        return None, None, None, None
-
-    round_id = round_row["id"]
-    round_name = round_row["name"]
-
-    # Step 2: Get first match in the round
-    match = fetch_one("""
-        SELECT * FROM matches
-        WHERE round_id = ?
-        ORDER BY match_datetime ASC
-        LIMIT 1
-    """, (round_id,))
-
     if not match:
-        return round_name, None, None, 0
+        return None, None, None, 0
 
     match_time = datetime.fromisoformat(match["match_datetime"])
     deadline = match_time - timedelta(hours=2)
+    
+    # 👇 Skip reminder if match is more than 4 days away
+    if match_time - now > timedelta(days=4):
+        return None, None, None, 0
+
+    # Step 2: Count matches in that round
+    match_count = fetch_one("""
+        SELECT COUNT(*) AS count FROM matches WHERE round_id = ?
+    """, (match["round_id"],))["count"]
+
+    return match["round_name"], deadline, match_time, match_count
 
     # Step 3: Count number of matches in the round
     match_count = fetch_one("""
