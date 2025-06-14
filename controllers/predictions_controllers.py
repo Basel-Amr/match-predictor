@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo  # Python 3.9+
 import pytz  # if you're using timezone-aware times
 import streamlit as st
 import sqlite3
@@ -6,10 +7,14 @@ from utils import fetch_one, execute_query, fetch_all
 from db import get_connection
 
 # Functions resposilbe for deadline
-def get_next_round_info():
-    now = datetime.now()
+# Define your timezone once globally
+local_tz = ZoneInfo("Africa/Cairo")
 
-    # Step 1: Find the earliest match that is in the future
+
+def get_next_round_info():
+    now_utc = datetime.now(timezone.utc)
+
+    # Step 1: Find the earliest future match
     match = fetch_one("""
         SELECT m.*, r.name AS round_name, r.id AS round_id
         FROM matches m
@@ -17,45 +22,39 @@ def get_next_round_info():
         WHERE m.match_datetime > ?
         ORDER BY m.match_datetime ASC
         LIMIT 1
-    """, (now.isoformat(),))
+    """, (now_utc.isoformat(),))
 
     if not match:
         return None, None, None, 0
 
-    match_time = datetime.fromisoformat(match["match_datetime"])
-    deadline = match_time - timedelta(hours=2)
-    
-    # 👇 Skip reminder if match is more than 4 days away
-    if match_time - now > timedelta(days=4):
+    # Parse DB datetime as UTC
+    match_time_local = datetime.fromisoformat(match["match_datetime"]).replace(tzinfo=local_tz)
+    match_time_utc = match_time_local.astimezone(timezone.utc)
+
+    deadline_utc = match_time_utc - timedelta(hours=2)
+
+    # ⛔ Skip round if it's too far in future (> 4 days)
+    if (match_time_utc - now_utc) > timedelta(days=4):
         return None, None, None, 0
 
-    # Step 2: Count matches in that round
     match_count = fetch_one("""
         SELECT COUNT(*) AS count FROM matches WHERE round_id = ?
     """, (match["round_id"],))["count"]
 
-    return match["round_name"], deadline, match_time, match_count
+    return match["round_name"], deadline_utc, match_time_utc, match_count
 
-    # Step 3: Count number of matches in the round
-    match_count = fetch_one("""
-        SELECT COUNT(*) as total_matches
-        FROM matches
-        WHERE round_id = ?
-    """, (round_id,))["total_matches"]
 
-    return round_name, deadline, match_time, match_count
-
-def format_time_left(deadline):
-    now = datetime.now()
-    time_diff = deadline - now
+def format_time_left(deadline_utc):
+    now_utc = datetime.now(timezone.utc)
+    time_diff = deadline_utc - now_utc
 
     if time_diff.total_seconds() <= 0:
         return "Deadline passed!", "❌"
 
-    if time_diff.total_seconds() < 3600:  # less than 1 hour
+    if time_diff.total_seconds() < 3600:  # < 1 hour
         minutes = int(time_diff.total_seconds() // 60)
         return f"{minutes} minute(s) left", "⏳"
-    elif time_diff.total_seconds() < 36000:  # less than 10 hours
+    elif time_diff.total_seconds() < 36000:  # < 10 hours
         hours = round(time_diff.total_seconds() / 3600, 1)
         return f"{hours} hour(s) left", "⏰"
     else:

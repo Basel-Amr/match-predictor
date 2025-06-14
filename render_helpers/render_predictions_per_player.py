@@ -5,7 +5,8 @@ from controllers.predictions_controllers import (
 )
 from controllers.manage_matches_controller import change_match_status
 import streamlit as st
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo  # Python 3.9+
 from operator import itemgetter
 from itertools import groupby
 from manage_modules.manage_perdictions import render_prediction_result, render_status_tag, render_match_result
@@ -18,20 +19,23 @@ from controllers.manage_predictions_controller import (
     fetch_match_by_id
 )
 from render_helpers.render_predictions import render_prediction_input
+local_tz = ZoneInfo("Africa/Cairo")
+def render_deadline(round_name, deadline_utc, match_count, number_of_predicted_matches=0):
+    now_local = datetime.now(timezone.utc).astimezone(local_tz)
+    deadline_local = deadline_utc.astimezone(local_tz)
 
-def render_deadline(round_name, deadline, match_count, number_of_predicted_matches=0):
-    now = datetime.now()
-    time_left = deadline - now
+    time_left = deadline_local - now_local
     days = time_left.days
     hours, remainder = divmod(time_left.seconds, 3600)
     minutes, _ = divmod(remainder, 60)
+
     # Prediction percentage
     prediction_ratio = number_of_predicted_matches / match_count if match_count else 0
     progress_bar = int(prediction_ratio * 100)
 
-    # Color based on prediction ratio
+    # Prediction color
     if prediction_ratio == 1:
-        pred_color = "#2ecc71"  # Green
+        pred_color = "#2ecc71"
     elif prediction_ratio >= 0.75:
         pred_color = "#27ae60"
     elif prediction_ratio >= 0.5:
@@ -39,7 +43,7 @@ def render_deadline(round_name, deadline, match_count, number_of_predicted_match
     elif prediction_ratio >= 0.25:
         pred_color = "#e67e22"
     else:
-        pred_color = "#e74c3c"  # Red
+        pred_color = "#e74c3c"
 
     # Time urgency color
     if time_left.total_seconds() < 3600:
@@ -51,6 +55,7 @@ def render_deadline(round_name, deadline, match_count, number_of_predicted_match
     else:
         time_color = "#1565c0"
 
+    # --- UI ---
     st.markdown(f"""
     <div style='text-align: center; margin-bottom: 30px;'>
         <h2 style="color:#1f77b4;">⚡ Prediction Center ⚡</h2>
@@ -58,7 +63,7 @@ def render_deadline(round_name, deadline, match_count, number_of_predicted_match
     </div>
     """, unsafe_allow_html=True)
 
-    # D H M Labels + Squares
+    # Time Left Box
     st.markdown(f"""
     <div style="display: flex; justify-content: center; gap: 30px; margin-top: 20px;">
         <div style="text-align: center;">
@@ -85,7 +90,7 @@ def render_deadline(round_name, deadline, match_count, number_of_predicted_match
     </div>
     """, unsafe_allow_html=True)
 
-    # Predicted Matches Count + Progress Bar
+    # Prediction Progress
     st.markdown(f"""
     <div style="margin-top: 30px; background: #f9f9f9; padding: 20px; border-radius: 15px;
                 text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
