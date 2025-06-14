@@ -8,6 +8,7 @@ from email.mime.multipart import MIMEMultipart
 from db import get_connection
 from utils import fetch_all
 from controllers.predictions_controllers import format_time_left, get_next_round_info, get_predicted_match_count
+from zoneinfo import ZoneInfo
 
 # Load environment variables
 load_dotenv()
