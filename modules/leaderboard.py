@@ -14,7 +14,7 @@ def get_current_round():
         """, (today, today))
     return round_data['name'] if round_data else "Unknown Round"
 
-AVATAR_FOLDER = os.path.join("Assets", "Avatars")  
+AVATAR_FOLDER = os.path.join("assets", "Avatars")  
 DEFAULT_AVATAR_PATH = os.path.join("Assets", "default_avatar.png")
 
 
