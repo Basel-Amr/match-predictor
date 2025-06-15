@@ -255,6 +255,11 @@ def render_rounds(player_id, round_name):
 
 def render_match_timing(match_time: datetime):
     now_local = datetime.now(timezone.utc).astimezone(local_tz)
+
+    # 🛠️ Ensure match_time is timezone-aware
+    if match_time.tzinfo is None or match_time.tzinfo.utcoffset(match_time) is None:
+        match_time = local_tz.localize(match_time)
+
     time_left = match_time - now_local
     total_seconds_left = time_left.total_seconds()
     hours_left = total_seconds_left / 3600
@@ -268,11 +273,12 @@ def render_match_timing(match_time: datetime):
         date_display = f"<span style='color: orange; font-weight: bold;'>⏰ {int(minutes_left)} min left</span>"
     elif 1 < hours_left <= 10:
         date_display = f"<span style='color: orange; font-weight: bold;'>⏰ {int(hours_left)} hours left</span>"
-    elif match_date == now.date() and hours_left > 0:
+    elif match_date == now_local.date() and hours_left > 0:
         date_display = "<span style='color: red; font-weight: bold;'>🔴 Today</span>"
-    elif match_date == now.date() + timedelta(days=1):
+    elif match_date == now_local.date() + timedelta(days=1):
         date_display = "<span style='color: blue; font-weight: bold;'>🌙 Tomorrow</span>"
     else:
         date_display = f"<span>📅 {match_time.strftime('%A, %B %d, %Y')}</span>"
-        
+
     return date_display
+
