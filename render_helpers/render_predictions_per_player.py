@@ -253,8 +253,8 @@ def render_rounds(player_id, round_name):
 
 
 def render_match_timing(match_time: datetime):
-    now = datetime.now()
-    time_left = match_time - now
+    now_local = datetime.now(timezone.utc).astimezone(local_tz)
+    time_left = match_time - now_local
     total_seconds_left = time_left.total_seconds()
     hours_left = total_seconds_left / 3600
     minutes_left = total_seconds_left / 60
