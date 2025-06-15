@@ -4,8 +4,8 @@ from utils import fetch_one
 from PIL import Image
 import os
 import hashlib
-AVATAR_FOLDER = os.path.join("Assets", "Avatars")  
-DEFAULT_AVATAR_PATH = os.path.join("Assets", "default_avatar.png")
+AVATAR_FOLDER = os.path.join("assets", "Avatars")  
+DEFAULT_AVATAR_PATH = os.path.join("assets", "default_avatar.png")
 
 import base64
 
