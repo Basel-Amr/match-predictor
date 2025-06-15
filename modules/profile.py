@@ -12,7 +12,7 @@ def image_to_base64(img: Image.Image) -> str:
     buffered = io.BytesIO()
     img.save(buffered, format="PNG")
     return base64.b64encode(buffered.getvalue()).decode()
-AVATAR_FOLDER = "Assets/Avatars"
+AVATAR_FOLDER = "assets/Avatars"
 
 def render(player_id):
     st.markdown("""
