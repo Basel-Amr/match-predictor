@@ -167,51 +167,57 @@ def render_match_card(match, player_id, round_id):
 
     home_name, home_logo = get_team_info(home_id)
     away_name, away_logo = get_team_info(away_id)
-    match_dt = datetime.fromisoformat(datetime_str)
+
+    # Convert match time from string to datetime with timezone info
+    match_dt = datetime.fromisoformat(datetime_str).replace(tzinfo=local_tz)
+
     prediction = get_user_prediction(player_id, match_id)
     selected_player_name = get_player_name(player_id)
     selected_player_id = player_id
-    # Get center HTML content from the helper function
-    center_html = render_match_info(match_dt, status, home_score, away_score, prediction, match, return_html=True)
-    # Fetch prediction deadline for the round
-    deadline = get_prediction_deadline_for_round(round_id)
-    now = datetime.now()
 
-    # Now combine into one HTML block
+    # Get the prediction deadline and current local time
+    round_id = match["round_id"]  # ensure using correct round
+    deadline_utc = get_prediction_deadline_for_round(round_id)
+    deadline_local = deadline_utc.astimezone(local_tz) if deadline_utc else None
+    now_local = datetime.now(timezone.utc).astimezone(local_tz)
+
+    # Layout: Main Card
     st.markdown("<div style='margin-bottom: 20px;'>", unsafe_allow_html=True)
     cols = st.columns([2.5, 5, 2.5, 2])
-    
+
     # Home Team
     with cols[0]:
         st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
         if home_logo:
             st.image(home_logo, width=45)
         st.markdown(f"<div style='font-weight:600;margin-top:5px;'>{home_name}</div>", unsafe_allow_html=True)
-    
-    # match info
+
+    # Match Info Center
     with cols[1]:
         render_match_info(match_dt, status, home_score, away_score, prediction, match, return_html=False)
+
     # Away Team
     with cols[2]:
         st.markdown("<div style='text-align:center;'>", unsafe_allow_html=True)
         if away_logo:
             st.image(away_logo, width=45)
         st.markdown(f"<div style='font-weight:600;margin-top:5px;'>{away_name}</div>", unsafe_allow_html=True)
-        
+
+    # Prediction Button or Deadline Passed
     with cols[3]:
-        if deadline and now < deadline:
+        if deadline_local and now_local < deadline_local:
             if st.button("🔮 Predict", key=f"predict_{match_id}", help="This Button is used to predict the result"):
                 st.session_state.predict_match_id = match_id
                 st.session_state.show_add_match_form = False
         else:
             st.markdown("<div style='color:red; font-weight:600;'>🚫 Deadline Passed</div>", unsafe_allow_html=True)
 
+    # Show prediction input form if this match is selected
     if st.session_state.get("predict_match_id") == match_id:
         render_prediction_input(match, selected_player_name, selected_player_id, upsert_prediction, fetch_predictions_for_player)
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("<hr style='margin:10px 0;'>", unsafe_allow_html=True)
-        
 
 
 
@@ -253,14 +259,21 @@ def render_rounds(player_id, round_name):
 
 
 def render_match_timing(match_time: datetime):
-    now = datetime.now()
+    # 🟡 Assume the match_time from DB is stored as local Cairo time (naive), so localize it properly
+    if match_time.tzinfo is None:
+        match_time = match_time.replace(tzinfo=local_tz)  # 👈 Don't assume UTC, use Cairo
+    else:
+        match_time = match_time.astimezone(local_tz)
+
+    now = datetime.now(timezone.utc).astimezone(local_tz)
+
     time_left = match_time - now
     total_seconds_left = time_left.total_seconds()
     hours_left = total_seconds_left / 3600
     minutes_left = total_seconds_left / 60
     match_date = match_time.date()
 
-    # Handle display logic
+    # Display logic
     if 0 < minutes_left < 1:
         date_display = "<span style='color: orange; font-weight: bold;'>⏰ Less than 1 min!</span>"
     elif 0 < hours_left <= 1:
@@ -273,5 +286,5 @@ def render_match_timing(match_time: datetime):
         date_display = "<span style='color: blue; font-weight: bold;'>🌙 Tomorrow</span>"
     else:
         date_display = f"<span>📅 {match_time.strftime('%A, %B %d, %Y')}</span>"
-        
+
     return date_display

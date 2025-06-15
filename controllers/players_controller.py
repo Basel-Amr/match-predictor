@@ -2,65 +2,87 @@ import sqlite3
 from db import get_connection  
 import bcrypt
 from PIL import Image
-
+from utils import fetch_one, fetch_all
 import os
 
 def get_player_info(player_id):
     conn = get_connection()
     cur = conn.cursor()
+    
+    # Fetch player info + achievements using LEFT JOIN in case no achievements exist
     cur.execute("""
         SELECT 
-            id, 
-            username, 
-            email, 
-            avatar_url, 
-            created_at,
-            (SELECT COALESCE(SUM(score), 0) FROM predictions WHERE player_id = players.id) AS total_points
-        FROM players 
-        WHERE id = ?
+            players.id, 
+            players.username, 
+            players.email, 
+            players.avatar_path, 
+            players.created_at,
+            (SELECT COALESCE(SUM(score), 0) FROM predictions WHERE player_id = players.id) AS total_points,
+            COALESCE(achievements.total_leagues_won, 0),
+            COALESCE(achievements.total_cups_won, 0)
+        FROM players
+        LEFT JOIN achievements ON players.id = achievements.player_id
+        WHERE players.id = ?
     """, (player_id,))
+    
     row = cur.fetchone()
     conn.close()
+
     if not row:
         return None
+
+    # Fetch full leaderboard and determine rank
+    leaderboard = fetch_all("""
+        SELECT id, 
+               (SELECT COALESCE(SUM(score), 0) FROM predictions WHERE player_id = players.id) AS total_points
+        FROM players
+        ORDER BY total_points DESC
+    """)
+
+    rank = next((index + 1 for index, entry in enumerate(leaderboard) if entry[0] == player_id), None)
+
     return {
         "id": row[0],
         "username": row[1],
         "email": row[2],
-        "avatar_url": row[3],
+        "avatar_path": row[3],
         "created_at": row[4],
         "total_points": row[5],
+        "total_leagues_won": row[6],
+        "total_cups_won": row[7],
+        "rank": rank
     }
 
 
-def update_player_info(player_id, username, email, password, avatar_url):
+
+def update_player_info(player_id, username, email, password=None, avatar_url=None, avatar_path=None):
     conn = get_connection()
     cur = conn.cursor()
     try:
-        password_hash = None
+        fields, params = [], []
+        fields.append("username = ?");   params.append(username)
+        fields.append("email = ?");      params.append(email)
         if password:
-            # Hash with bcrypt
-            salt = bcrypt.gensalt()
-            password_hash = bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
+            hashed = hash_password(password)
+            fields.append("password_hash = ?"); params.append(hashed)
+        if avatar_url is not None:
+            fields.append("avatar_url = ?"); params.append(avatar_url)
+        if avatar_path is not None:
+            fields.append("avatar_path = ?"); params.append(avatar_path)
+        fields.append("updated_at = datetime('now')")
 
-        if password_hash:
-            cur.execute("""
-                UPDATE players SET username=?, email=?, password_hash=?, avatar_url=?, updated_at=CURRENT_TIMESTAMP
-                WHERE id=?
-            """, (username, email, password_hash, avatar_url, player_id))
-        else:
-            cur.execute("""
-                UPDATE players SET username=?, email=?, avatar_url=?, updated_at=CURRENT_TIMESTAMP
-                WHERE id=?
-            """, (username, email, avatar_url, player_id))
-
+        sql = f"UPDATE players SET {', '.join(fields)} WHERE id = ?"
+        params.append(player_id)
+        cur.execute(sql, params)
         conn.commit()
         return True
     except Exception as e:
-        print("Error updating player:", e)
+        print("❌ update_player_info error:", e)
+        conn.rollback()
         return False
     finally:
         conn.close()
+
 
 def delete_player(player_id):
     conn = get_connection()

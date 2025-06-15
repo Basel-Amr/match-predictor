@@ -13,7 +13,7 @@ def get_players(search=""):
             p.username, 
             p.email, 
             p.role, 
-            p.avatar_url,
+            p.avatar_path,
             p.last_login_at,
             IFNULL(SUM(pr.score), 0) AS total_points,
             IFNULL(a.total_leagues_won, 0),
@@ -28,7 +28,7 @@ def get_players(search=""):
         query += " WHERE p.username LIKE ? OR p.email LIKE ?"
         params = [f"%{search}%", f"%{search}%"]
 
-    query += " GROUP BY p.id, p.username, p.email, p.role, p.avatar_url, p.last_login_at, a.total_leagues_won, a.total_cups_won"
+    query += " GROUP BY p.id, p.username, p.email, p.role, p.avatar_path, p.last_login_at, a.total_leagues_won, a.total_cups_won"
 
     cur.execute(query, params)
     rows = cur.fetchall()
@@ -39,7 +39,7 @@ def get_players(search=""):
         "username": r[1],
         "email": r[2],
         "role": r[3],
-        "avatar_url": r[4],
+        "avatar_path": r[4],
         "last_login_at": r[5],
         "total_points": r[6],
         "total_leagues_won": r[7],

@@ -4,6 +4,36 @@ from utils import fetch_one
 from PIL import Image
 import os
 import hashlib
+AVATAR_FOLDER = os.path.join("Assets", "Avatars")  
+DEFAULT_AVATAR_PATH = os.path.join("Assets", "default_avatar.png")
+
+import base64
+
+def _render_circular_avatar(img_path, size=50):
+    try:
+        with open(img_path, "rb") as f:
+            img_bytes = f.read()
+            b64_img = base64.b64encode(img_bytes).decode()
+
+        avatar_html = f"""
+        <div style="
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: {size}px;
+            height: {size}px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 2px solid #4A90E2;
+            box-shadow: 0 0 4px rgba(0,0,0,0.2);
+        ">
+            <img src="data:image/png;base64,{b64_img}" style="width: 100%; height: auto;" />
+        </div>
+        """
+        st.markdown(avatar_html, unsafe_allow_html=True)
+    except Exception:
+        st.write("👤")
+
 
 def render():
     st.title("⚽ Manage Players")
@@ -30,14 +60,15 @@ def render():
         cols = st.columns([1, 3, 3, 2, 1, 1, 1, 2, 1, 1])  # avatar, username, email, role, points, leagues, cups, last login, edit, delete
 
         with cols[0]:
-            avatar_url = player.get("avatar_url")
-            if avatar_url:
-                try:
-                    st.image(avatar_url, width=40)
-                except Exception:
-                    _show_default_avatar()
+            avatar_filename = player.get("avatar_path")
+            full_avatar_path = os.path.join(AVATAR_FOLDER, avatar_filename) if avatar_filename else None
+
+            if avatar_filename and os.path.exists(full_avatar_path):
+                _render_circular_avatar(full_avatar_path)
             else:
-                _show_default_avatar()
+                _render_circular_avatar(DEFAULT_AVATAR_PATH)
+
+
 
         with cols[1]:
             st.write(player["username"])
@@ -92,12 +123,12 @@ def render():
         show_add_edit_modal()
 
 def _show_default_avatar():
-    img_path = os.path.join(os.path.dirname(__file__), "..", "assets", "default_avatar.png")
     try:
-        img = Image.open(img_path)
+        img = Image.open(DEFAULT_AVATAR_PATH)
         st.image(img, width=40)
     except Exception:
         st.write("👤")  # fallback emoji
+
 
 def show_add_edit_modal():
     player = st.session_state.get("editing_player")

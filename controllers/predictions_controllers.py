@@ -11,37 +11,54 @@ from db import get_connection
 local_tz = ZoneInfo("Africa/Cairo")
 
 
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+
+local_tz = ZoneInfo("Africa/Cairo")
+
 def get_next_round_info():
-    now_utc = datetime.now(timezone.utc)
+    now_local = datetime.now(local_tz)
 
-    # Step 1: Find the earliest future match
-    match = fetch_one("""
-        SELECT m.*, r.name AS round_name, r.id AS round_id
-        FROM matches m
-        JOIN rounds r ON m.round_id = r.id
-        WHERE m.match_datetime > ?
-        ORDER BY m.match_datetime ASC
+    # Step 1: Find the next round based on start_date
+    round = fetch_one("""
+        SELECT *
+        FROM rounds
+        WHERE DATE(start_date) > DATE(?)
+        ORDER BY DATE(start_date)
         LIMIT 1
-    """, (now_utc.isoformat(),))
+    """, (now_local.date().isoformat(),))
 
-    if not match:
+    if not round:
         return None, None, None, 0
 
-    # Parse DB datetime as UTC
-    match_time_local = datetime.fromisoformat(match["match_datetime"]).replace(tzinfo=local_tz)
-    match_time_utc = match_time_local.astimezone(timezone.utc)
+    round_id = round["id"]
+    round_name = round["name"]
+    round_start = datetime.fromisoformat(round["start_date"]).replace(tzinfo=local_tz)
 
-    deadline_utc = match_time_utc - timedelta(hours=2)
+    # Step 2: Get the first match in that round
+    match = fetch_one("""
+        SELECT *
+        FROM matches
+        WHERE round_id = ?
+        ORDER BY match_datetime
+        LIMIT 1
+    """, (round_id,))
 
-    # ⛔ Skip round if it's too far in future (> 4 days)
-    if (match_time_utc - now_utc) > timedelta(days=4):
-        return None, None, None, 0
+    if match:
+        match_time_utc = datetime.fromisoformat(match["match_datetime"]).replace(tzinfo=timezone.utc)
+        match_time_local = match_time_utc.astimezone(local_tz)
 
-    match_count = fetch_one("""
-        SELECT COUNT(*) AS count FROM matches WHERE round_id = ?
-    """, (match["round_id"],))["count"]
+        deadline_utc = match_time_utc - timedelta(hours=2)
 
-    return match["round_name"], deadline_utc, match_time_utc, match_count
+        # Step 3: Count matches in this round
+        match_count = fetch_one("""
+            SELECT COUNT(*) AS count FROM matches WHERE round_id = ?
+        """, (round_id,))["count"]
+
+        return round_name, deadline_utc, match_time_local, match_count
+
+    return round_name, None, None, 0
+
 
 
 def format_time_left(deadline_utc):
@@ -257,19 +274,19 @@ def get_player_name(player_id):
 def get_prediction_deadline_for_round(round_id):
     conn = get_connection()
     cursor = conn.cursor()
-    
+
     cursor.execute("""
         SELECT MIN(match_datetime)
         FROM matches
         WHERE round_id = ?
     """, (round_id,))
-    
+
     result = cursor.fetchone()
     conn.close()
 
     if result and result[0]:
-        earliest_match_dt = datetime.fromisoformat(result[0])
-        deadline = earliest_match_dt - timedelta(hours=2)
-        return deadline
+        earliest_match_dt = datetime.fromisoformat(result[0]).replace(tzinfo=timezone.utc)
+        deadline_utc = earliest_match_dt - timedelta(hours=2)
+        return deadline_utc
     else:
         return None
