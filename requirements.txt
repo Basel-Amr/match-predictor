@@ -9,3 +9,4 @@ numpy
 streamlit-option-menu
 streamlit_cropper
 streamlit_autorefresh
+streamlit_extras
