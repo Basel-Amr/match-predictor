@@ -7,6 +7,7 @@ from controllers.manage_matches_controller import change_match_status
 import streamlit as st
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo  # Python 3.9+
+import pytz
 from operator import itemgetter
 from itertools import groupby
 from manage_modules.manage_perdictions import render_prediction_result, render_status_tag, render_match_result
@@ -19,7 +20,7 @@ from controllers.manage_predictions_controller import (
     fetch_match_by_id
 )
 from render_helpers.render_predictions import render_prediction_input
-local_tz = ZoneInfo("Africa/Cairo")
+local_tz = pytz.timezone('Africa/Cairo')
 def render_deadline(round_name, deadline_utc, match_count, number_of_predicted_matches=0):
     now_local = datetime.now(timezone.utc).astimezone(local_tz)
     deadline_local = deadline_utc.astimezone(local_tz)
