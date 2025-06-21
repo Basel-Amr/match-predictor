@@ -2,6 +2,18 @@ import streamlit as st
 from controllers.manage_matches_controller import fetch_stage_by_id
 from utils import fetch_one
 
+def get_team_info(team_id):
+    result = fetch_one("""
+        SELECT name, logo_path
+        FROM teams
+        WHERE id = ?
+    """, (team_id,))
+
+    if result:
+        return result["name"], result["logo_path"]
+    else:
+        return "Unknown", None
+
 def select_player(match, player_options):
     st.markdown("### Enter Your Prediction")
     selected_player = st.selectbox(
@@ -16,48 +28,59 @@ def fetch_and_get_prev_pred(selected_player_id, match_id, fetch_predictions_for_
     pred_dict = {pred['match_id']: pred for pred in predictions}
     return pred_dict.get(match_id)
 
-def input_scores_and_penalty(match, prev_pred, can_be_draw, must_have_winner,key_suffix=""):
+
+def input_scores_and_penalty(match, prev_pred, can_be_draw, must_have_winner, key_suffix=""):
+    # 🌟 Load defaults if they exist
     default_home = prev_pred['predicted_home_score'] if prev_pred else 0
     default_away = prev_pred['predicted_away_score'] if prev_pred else 0
     default_penalty = prev_pred.get('predicted_penalty_winner', "None") if prev_pred else "None"
 
-    predicted_home = st.number_input(
-        "Predicted Home Score",
-        min_value=0,
-        max_value=10,
-        step=1,
-        value=default_home,
-        key=f"ph_{match['id']}_{key_suffix}"
-    )
+    # ✅ Get actual team names
+    home_name, _ = get_team_info(match['home_team_id'])
+    away_name, _ = get_team_info(match['away_team_id'])
 
-    predicted_away = st.number_input(
-        "Predicted Away Score",
-        min_value=0,
-        max_value=10,
-        step=1,
-        value=default_away,
-        key=f"pa_{match['id']}{key_suffix}"
-    )
+    st.markdown("### ⚽ Enter Your Prediction")
 
+    # 🎯 Score inputs side-by-side
+    col1, col2, col3 = st.columns([4, 1, 4])
+
+    with col1:
+        predicted_home = st.number_input(
+            f"🏠 {home_name}", min_value=0, max_value=10, step=1,
+            value=default_home, key=f"ph_{match['id']}_{key_suffix}"
+        )
+
+    with col2:
+        st.markdown("<div style='text-align:center; font-size:24px; margin-top:30px;'>vs</div>", unsafe_allow_html=True)
+
+    with col3:
+        predicted_away = st.number_input(
+            f"✈️ {away_name}", min_value=0, max_value=10, step=1,
+            value=default_away, key=f"pa_{match['id']}_{key_suffix}"
+        )
+
+    # 🚨 Draw situation that needs a penalty winner
     is_draw = predicted_home == predicted_away
+    penalty_winner = "None"
 
     if is_draw and can_be_draw and must_have_winner:
-        penalty_options = ["None", match['home_team_name'], match['away_team_name']]
+        penalty_options = ["None", home_name, away_name]
         if default_penalty not in penalty_options:
             default_penalty = "None"
 
         penalty_winner = st.selectbox(
-            "Penalty Winner (required because match must have a winner)",
-            penalty_options,
+            "⚖️ Penalty Winner (Draw detected — winner required)",
+            options=penalty_options,
             index=penalty_options.index(default_penalty),
-            key=f"penalty_{match['id']}"
+            key=f"penalty_{match['id']}_{key_suffix}"
         )
     else:
         st.markdown(
-            "<i>Penalty winner selection is only needed for draw matches that must have a winner.</i>",
+            "<div style='color:gray; font-style:italic;'>"
+            "🔘 Penalty winner selection only needed if the match ends in a draw and a winner must be declared."
+            "</div>",
             unsafe_allow_html=True
         )
-        penalty_winner = "None"
 
     return predicted_home, predicted_away, penalty_winner
 

@@ -13,6 +13,11 @@ from controllers.manage_predictions_controller import update_scores_for_match
 from itertools import groupby
 from datetime import datetime, timedelta
 from utils import fetch_one, execute_query
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
+local_tz = ZoneInfo("Africa/Cairo")
+
 # Icons
 MANAGE_ICON = "🛠️"
 VIEW_ICON = "📅"
@@ -341,8 +346,11 @@ def render_view_matches_tab():
             """, unsafe_allow_html=True)
         
         for match in group:
-            match_time = datetime.fromisoformat(match['match_datetime'])
+            # Parse match time as UTC, then convert to Cairo time
+            match_time_utc = datetime.fromisoformat(match['match_datetime']).replace(tzinfo=timezone.utc)
+            match_time = match_time_utc.astimezone(local_tz)
             stage_name = str(match['stage_name'])
+            now = datetime.now(timezone.utc).astimezone(local_tz)
             time_diff = match_time - now
             total_seconds_left = time_diff.total_seconds()
             hours_left = total_seconds_left / 3600

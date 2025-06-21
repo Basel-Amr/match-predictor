@@ -17,10 +17,47 @@ from zoneinfo import ZoneInfo
 local_tz = ZoneInfo("Africa/Cairo")
 
 def get_next_round_info():
-    now_local = datetime.now(local_tz)
+    now_utc = datetime.now(timezone.utc)
+    now_local = now_utc.astimezone(local_tz)
 
-    # Step 1: Find the next round based on start_date
-    round = fetch_one("""
+    # Step 1: Try current round
+    current_round = fetch_one("""
+        SELECT *
+        FROM rounds
+        WHERE DATE(start_date) <= DATE(?) AND DATE(end_date) >= DATE(?)
+        ORDER BY DATE(start_date)
+        LIMIT 1
+    """, (now_local.date().isoformat(), now_local.date().isoformat()))
+
+    if current_round:
+        round_id = current_round["id"]
+        round_name = current_round["name"]
+
+        # Fetch first match in this round
+        match = fetch_one("""
+            SELECT *
+            FROM matches
+            WHERE round_id = ?
+            ORDER BY match_datetime
+            LIMIT 1
+        """, (round_id,))
+
+        if match:
+            first_match_utc = datetime.fromisoformat(match["match_datetime"]).replace(tzinfo=timezone.utc)
+
+            # Check if first match is still in the future
+            if first_match_utc > now_utc:
+                deadline_utc = first_match_utc - timedelta(hours=2)
+                match_time_local = first_match_utc.astimezone(local_tz)
+
+                match_count = fetch_one("""
+                    SELECT COUNT(*) AS count FROM matches WHERE round_id = ?
+                """, (round_id,))["count"]
+
+                return round_name, deadline_utc, match_time_local, match_count
+
+    # Step 2: Try the next round
+    next_round = fetch_one("""
         SELECT *
         FROM rounds
         WHERE DATE(start_date) > DATE(?)
@@ -28,36 +65,32 @@ def get_next_round_info():
         LIMIT 1
     """, (now_local.date().isoformat(),))
 
-    if not round:
-        return None, None, None, 0
+    if next_round:
+        round_id = next_round["id"]
+        round_name = next_round["name"]
 
-    round_id = round["id"]
-    round_name = round["name"]
-    round_start = datetime.fromisoformat(round["start_date"]).replace(tzinfo=local_tz)
+        match = fetch_one("""
+            SELECT *
+            FROM matches
+            WHERE round_id = ?
+            ORDER BY match_datetime
+            LIMIT 1
+        """, (round_id,))
 
-    # Step 2: Get the first match in that round
-    match = fetch_one("""
-        SELECT *
-        FROM matches
-        WHERE round_id = ?
-        ORDER BY match_datetime
-        LIMIT 1
-    """, (round_id,))
+        if match:
+            first_match_utc = datetime.fromisoformat(match["match_datetime"]).replace(tzinfo=timezone.utc)
+            deadline_utc = first_match_utc - timedelta(hours=2)
+            match_time_local = first_match_utc.astimezone(local_tz)
 
-    if match:
-        match_time_utc = datetime.fromisoformat(match["match_datetime"]).replace(tzinfo=timezone.utc)
-        match_time_local = match_time_utc.astimezone(local_tz)
+            match_count = fetch_one("""
+                SELECT COUNT(*) AS count FROM matches WHERE round_id = ?
+            """, (round_id,))["count"]
 
-        deadline_utc = match_time_utc - timedelta(hours=2)
+            return round_name, deadline_utc, match_time_local, match_count
 
-        # Step 3: Count matches in this round
-        match_count = fetch_one("""
-            SELECT COUNT(*) AS count FROM matches WHERE round_id = ?
-        """, (round_id,))["count"]
+    return None, None, None, 0
 
-        return round_name, deadline_utc, match_time_local, match_count
 
-    return round_name, None, None, 0
 
 
 

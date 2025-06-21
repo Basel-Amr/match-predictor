@@ -21,9 +21,13 @@ from controllers.manage_predictions_controller import (
 from render_helpers.render_predictions import render_prediction_input
 local_tz = ZoneInfo("Africa/Cairo")
 def render_deadline(round_name, deadline_utc, match_count, number_of_predicted_matches=0):
+    if not deadline_utc:
+        st.warning("📅 No upcoming round or deadline found.")
+        return
+
     now_local = datetime.now(timezone.utc).astimezone(local_tz)
     deadline_local = deadline_utc.astimezone(local_tz)
-
+    print(deadline_local)
     time_left = deadline_local - now_local
     days = time_left.days
     hours, remainder = divmod(time_left.seconds, 3600)
