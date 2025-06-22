@@ -20,6 +20,9 @@ def get_next_round_info():
     now_utc = datetime.now(timezone.utc)
     now_local = now_utc.astimezone(local_tz)
 
+    # print(f"[🕒 Now UTC]: {now_utc.isoformat()}")
+    # print(f"[🕒 Now Local]: {now_local.isoformat()}")
+
     # Step 1: Try current round
     current_round = fetch_one("""
         SELECT *
@@ -33,7 +36,6 @@ def get_next_round_info():
         round_id = current_round["id"]
         round_name = current_round["name"]
 
-        # Fetch first match in this round
         match = fetch_one("""
             SELECT *
             FROM matches
@@ -43,12 +45,20 @@ def get_next_round_info():
         """, (round_id,))
 
         if match:
-            first_match_utc = datetime.fromisoformat(match["match_datetime"]).replace(tzinfo=timezone.utc)
+            # 🚫 DO NOT assume stored datetime is UTC; it's Cairo-local
+            first_match_local = datetime.fromisoformat(match["match_datetime"]).replace(tzinfo=local_tz)
+            first_match_utc = first_match_local.astimezone(timezone.utc)
 
-            # Check if first match is still in the future
+            # print(f"[📅 Match Time Local]: {first_match_local.isoformat()}")
+            # print(f"[🌐 Match Time UTC]: {first_match_utc.isoformat()}")
+
+            # Check if the match is still in the future
             if first_match_utc > now_utc:
                 deadline_utc = first_match_utc - timedelta(hours=2)
                 match_time_local = first_match_utc.astimezone(local_tz)
+
+                # print(f"[⏳ Deadline UTC]: {deadline_utc.isoformat()}")
+                # print(f"[⏳ Deadline Local]: {deadline_utc.astimezone(local_tz).isoformat()}")
 
                 match_count = fetch_one("""
                     SELECT COUNT(*) AS count FROM matches WHERE round_id = ?
@@ -78,9 +88,17 @@ def get_next_round_info():
         """, (round_id,))
 
         if match:
-            first_match_utc = datetime.fromisoformat(match["match_datetime"]).replace(tzinfo=timezone.utc)
+            first_match_local = datetime.fromisoformat(match["match_datetime"]).replace(tzinfo=local_tz)
+            first_match_utc = first_match_local.astimezone(timezone.utc)
+
+            # print(f"[📅 NEXT Match Time Local]: {first_match_local.isoformat()}")
+            # print(f"[🌐 NEXT Match Time UTC]: {first_match_utc.isoformat()}")
+
             deadline_utc = first_match_utc - timedelta(hours=2)
             match_time_local = first_match_utc.astimezone(local_tz)
+
+            # print(f"[⏳ NEXT Deadline UTC]: {deadline_utc.isoformat()}")
+            # print(f"[⏳ NEXT Deadline Local]: {deadline_utc.astimezone(local_tz).isoformat()}")
 
             match_count = fetch_one("""
                 SELECT COUNT(*) AS count FROM matches WHERE round_id = ?

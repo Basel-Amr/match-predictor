@@ -346,9 +346,9 @@ def render_view_matches_tab():
             """, unsafe_allow_html=True)
         
         for match in group:
-            # Parse match time as UTC, then convert to Cairo time
-            match_time_utc = datetime.fromisoformat(match['match_datetime']).replace(tzinfo=timezone.utc)
-            match_time = match_time_utc.astimezone(local_tz)
+            # Parse match time as Cairo-local (because it was saved that way)
+            match_time = datetime.fromisoformat(match['match_datetime']).replace(tzinfo=local_tz)
+            #match_time = match_time_utc.astimezone(local_tz)
             stage_name = str(match['stage_name'])
             now = datetime.now(timezone.utc).astimezone(local_tz)
             time_diff = match_time - now
