@@ -4,6 +4,7 @@ import streamlit as st
 from dotenv import load_dotenv
 from utils import execute_query, fetch_one, hash_password, verify_password
 import datetime
+from zoneinfo import ZoneInfo
 
 load_dotenv()
 ADMIN_SECRET_CODE = os.getenv("ADMIN_SECRET_CODE", "")
@@ -18,8 +19,10 @@ def create_user(username, email, password, role="player"):
     execute_query(query, (username, email, hashed, role))
     return True
 
+local_tz = ZoneInfo("Africa/Cairo")
+
 def update_last_login(username):
-    now = datetime.datetime.now().isoformat(timespec='seconds')
+    now = datetime.now(local_tz).isoformat(timespec='seconds')
     query = "UPDATE players SET last_login_at = ? WHERE username = ?"
     execute_query(query, (now, username))
     
