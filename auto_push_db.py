@@ -2,10 +2,14 @@
 import os
 import subprocess
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import streamlit as st
 
 def auto_push_db():
     try:
+        # Timezone setup for Cairo
+        local_tz = ZoneInfo("Africa/Cairo")
+
         GITHUB_TOKEN = os.getenv("GH_TOKEN") or st.secrets["GH_TOKEN"]
         GITHUB_USER = "Basel-Amr"
         GITHUB_REPO = "match-predictor"
@@ -21,8 +25,10 @@ def auto_push_db():
 
         # Add, commit and push
         subprocess.run(["git", "add", DB_FILE])
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        now = datetime.now(local_tz).strftime("%Y-%m-%d %H:%M:%S")  # Cairo local time
         subprocess.run(["git", "commit", "-m", f"Auto update DB: {now}"])
+
         repo_url = f"https://{GITHUB_USER}:{GITHUB_TOKEN}@github.com/{GITHUB_USER}/{GITHUB_REPO}.git"
         subprocess.run(["git", "push", repo_url])
 
