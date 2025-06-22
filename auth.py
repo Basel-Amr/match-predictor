@@ -3,7 +3,7 @@ import os
 import streamlit as st
 from dotenv import load_dotenv
 from utils import execute_query, fetch_one, hash_password, verify_password
-import datetime
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 load_dotenv()
