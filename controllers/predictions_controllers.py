@@ -336,8 +336,9 @@ def get_prediction_deadline_for_round(round_id):
     conn.close()
 
     if result and result[0]:
-        earliest_match_dt = datetime.fromisoformat(result[0]).replace(tzinfo=timezone.utc)
-        deadline_utc = earliest_match_dt - timedelta(hours=2)
+        # Assume match_datetime is stored in Cairo local time
+        earliest_match_local = datetime.fromisoformat(result[0]).replace(tzinfo=local_tz)
+        deadline_utc = earliest_match_local.astimezone(timezone.utc) - timedelta(hours=2)
         return deadline_utc
     else:
         return None
