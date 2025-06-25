@@ -27,7 +27,7 @@ def render_deadline(round_name, deadline_utc, match_count, number_of_predicted_m
 
     now_local = datetime.now(timezone.utc).astimezone(local_tz)
     deadline_local = deadline_utc.astimezone(local_tz)
-    print(deadline_local)
+    #print(deadline_local)
     time_left = deadline_local - now_local
     days = time_left.days
     hours, remainder = divmod(time_left.seconds, 3600)
@@ -129,7 +129,8 @@ def render_match_info(match_dt, status, home_score, away_score, prediction, matc
         phs = prediction['predicted_home_score']
         pas = prediction['predicted_away_score']
         try: 
-            penalty = prediction.get('predicted_penalty_winner', "")
+            penalty = prediction['predicted_penalty_winner']
+            print(f"The Penalty winner is penalty")
         except:
             penalty = ""
         penalty_display = f" ({penalty} wins on pens)" if penalty else ""

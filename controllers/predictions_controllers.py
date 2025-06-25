@@ -185,7 +185,7 @@ def get_team_info(team_id):
 
 def get_user_prediction(player_id, match_id):
     query = """
-        SELECT predicted_home_score, predicted_away_score, score
+        SELECT predicted_home_score, predicted_away_score, score, predicted_penalty_winner
         FROM predictions
         WHERE player_id = ? AND match_id = ?
     """
