@@ -130,7 +130,6 @@ def render_match_info(match_dt, status, home_score, away_score, prediction, matc
         pas = prediction['predicted_away_score']
         try: 
             penalty = prediction['predicted_penalty_winner']
-            print(f"The Penalty winner is penalty")
         except:
             penalty = ""
         penalty_display = f" ({penalty} wins on pens)" if penalty else ""
