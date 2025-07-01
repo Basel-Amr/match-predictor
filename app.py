@@ -82,7 +82,10 @@ def main_page():
         
     if not round_name:
         st.warning("No upcoming rounds found.")
-        return
+    else:
+        # Proceed only if round_name exists
+        st.subheader(f"Upcoming Round: {round_name}")
+        # Other UI related to the round
 
     if st.session_state.role == "admin":
         show_tabs.append("Manage")
